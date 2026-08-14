@@ -1,6 +1,6 @@
 {
   "version": "0.1.0",
   "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Control_v0_1_0_UPDATE.zip",
-  "sha256": "8be1cbdf21fb6cef83bd445638ea45cffa10564a5f41f06bc800b55faf61f4e2",
+  "sha256": "9c16f2595db1cf42f6136d907e66e5009daac0c7d2da4d412d13ba4a7bc6393d",
   "notes": "Initial MXB Race Control foundation. Future releases will be published to this channel for one-click in-app update, install, and automatic restart."
 }
