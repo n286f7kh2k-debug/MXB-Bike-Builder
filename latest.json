@@ -1,0 +1,6 @@
+{
+  "version": "0.4.3",
+  "url": "releases/MXB_Bike_Builder_v0_4_3_UPDATE.zip",
+  "sha256": "07991ae6657863f80c3a1f826e0b22b9611d15c2c4e2c3cb63ebd8f79508ce65",
+  "notes": "Adds the permanent GitHub update channel. After this version is installed, future MXB Bike Builder updates can be installed from the in-app Update button."
+}
