@@ -1,6 +1,6 @@
 {
-  "version": "0.4.6",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/releases/MXB_Bike_Builder_v0_4_6_UPDATE.zip",
-  "sha256": "aea4795080b136dae8025553601670677638aa4e261e5149a7172822e91b8a22",
-  "notes": "Fixes the repeated OEM missing-EDF-header error by ignoring stale EDF-named redirect/placeholder selections, following valid local OEM redirects, and falling back to the installed OEM bike/model automatically."
+  "version": "0.4.7",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/releases/MXB_Bike_Builder_v0_4_7_UPDATE.zip",
+  "sha256": "15f4244345b76c45abe28324befb6a0716ec41c93a707559665657ca971cd980",
+  "notes": "Adds creator-locked OEM compatibility mode for 3D preview. Locked creator packages remain untouched; when Project OEM has a separate installed visual model under OEM_Models/MX, MXB Bike Builder uses that readable model instead. Build/install steps that need donor files still require an unlocked or authorized donor source."
 }
