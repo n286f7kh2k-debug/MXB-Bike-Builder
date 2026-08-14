@@ -1,6 +1,6 @@
 {
-  "version": "0.4.5",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/releases/MXB_Bike_Builder_v0_4_5_UPDATE_LEAN.zip",
-  "sha256": "",
-  "notes": "Fixes OEM bike loading for the newer Project OEM layout by validating EDF headers and searching OEM_Models/MX for the real shared bike model. SHA verification is temporarily disabled for this one v0.4.5 update because the manually published GitHub ZIP bytes do not match the local build checksum. Future releases will use the repository publishing workflow to generate the checksum from the hosted update bytes."
+  "version": "0.4.6",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/releases/MXB_Bike_Builder_v0_4_6_UPDATE.zip",
+  "sha256": "aea4795080b136dae8025553601670677638aa4e261e5149a7172822e91b8a22",
+  "notes": "Fixes the repeated OEM missing-EDF-header error by ignoring stale EDF-named redirect/placeholder selections, following valid local OEM redirects, and falling back to the installed OEM bike/model automatically."
 }
