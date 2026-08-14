@@ -1,6 +1,6 @@
 {
-  "version": "0.4.4",
-  "url": "releases/MXB_Bike_Builder_v0_4_4_UPDATE.zip",
-  "sha256": "56652e6f9c47c212aecb0d47a17048e26e70cb4eb2090e3386793530b8225604",
-  "notes": "Fixes the Windows updater restart bug and adds automatic MXB Bike Builder desktop-shortcut creation. Because v0.4.3's old updater is the code applying this update, v0.4.4 may fail to reopen one final time. If that happens, open the app manually once; v0.4.4 will create the desktop shortcut and future updates will use the fixed restart method."
+  "version": "0.4.5",
+  "url": "releases/MXB_Bike_Builder_v0_4_5_UPDATE_LEAN.zip",
+  "sha256": "ddc627434a5e754b62c21834b28b6bc42503caa13dc6001c2eb9f5d591dde873",
+  "notes": "Fixes OEM bike loading for the newer Project OEM layout by validating EDF headers and searching OEM_Models/MX for the real shared bike model."
 }
