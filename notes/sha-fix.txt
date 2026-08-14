@@ -1,0 +1,1 @@
+Re-publishing v0.4.3 update payload with corrected SHA-256 matching the exact ZIP bytes.
