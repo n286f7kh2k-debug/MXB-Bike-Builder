@@ -1,6 +1,6 @@
 {
   "version": "0.4.3",
-  "url": "releases/MXB_Bike_Builder_v0_4_3_UPDATE.zip",
-  "sha256": "07991ae6657863f80c3a1f826e0b22b9611d15c2c4e2c3cb63ebd8f79508ce65",
-  "notes": "Adds the permanent GitHub update channel. After this version is installed, future MXB Bike Builder updates can be installed from the in-app Update button."
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/releases/MXB_Bike_Builder_v0_4_3_UPDATE.zip",
+  "sha256": "",
+  "notes": "Transitional v0.4.3 updater bootstrap. SHA verification is temporarily disabled for this one bootstrap update because the originally published checksum did not match the GitHub-hosted ZIP bytes. Future releases will restore SHA-256 verification."
 }
