@@ -1,11 +1,6 @@
 {
   "version": "0.2.8",
   "filename": "MXB_Race_Day_Live_v0_2_8_UPDATE.zip",
-  "sha256": "fd92015d269bc789cc2077bb6ef23d4666292f3286c2f9fefd32b0197a465df1",
-  "notes": "MXB Race Day Live v0.2.8: fixes Find a Race track artwork by using explicit venue-to-track mappings for Millville/Spring Creek, RedBud/Buchanan, Fox Raceway/Pala, Anaheim 1, and San Diego, rejects random gear/product matches, and clears the old track-image cache once so incorrect images cannot persist.",
-  "chunks": [
-    "race-control/staging/v0_2_8/chunk00.b64",
-    "race-control/staging/v0_2_8/chunk01.b64",
-    "race-control/staging/v0_2_8/chunk02.b64"
-  ]
+  "notes": "MXB Race Day Live v0.2.8: complete package preserving the working live updater and automatic restart path from v0.2.7, plus the corrected Find a Race track-image mappings and stale-image cache reset.",
+  "builder_script": "race-control/build_v028_complete.py"
 }
