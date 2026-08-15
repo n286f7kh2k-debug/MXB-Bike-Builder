@@ -2,7 +2,7 @@
   "version": "0.2.6",
   "filename": "MXB_Race_Day_Live_v0_2_6_UPDATE.zip",
   "sha256": "73503702db20e69bfa248060045d7fc26b55e88f08f912b9060a45e7b92c9d5a",
-  "notes": "MXB Race Day Live v0.2.6: replaces raw GitHub manifest checks with the GitHub Contents API to prevent stale update results, keeps the raw feed only as a fallback, and includes the Find a Race track-image fixes.",
+  "notes": "MXB Race Day Live v0.2.6: replaces raw GitHub manifest checks with the GitHub Contents API to prevent stale update results, keeps the raw feed only as a fallback, includes the Find a Race track-image fixes, and uses the corrected release publisher.",
   "chunks": [
     "race-control/staging/v0_2_6/chunk00.b64",
     "race-control/staging/v0_2_6/chunk01.b64",
