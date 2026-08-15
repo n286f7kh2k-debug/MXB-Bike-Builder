@@ -30,8 +30,13 @@ jobs:
           expected = str(req.get('sha256', '')).strip().lower()
           notes = str(req.get('notes', '')).strip()
 
-          encoded = ''.join(Path(path).read_text(encoding='ascii').strip() for path in chunks)
-          payload = base64.b64decode(encoded, validate=True)
+          chunk_texts = [Path(path).read_text(encoding='ascii').strip() for path in chunks]
+          try:
+              encoded = ''.join(chunk_texts)
+              payload = base64.b64decode(encoded, validate=True)
+          except Exception:
+              payload = b''.join(base64.b64decode(chunk, validate=True) for chunk in chunk_texts)
+
           digest = hashlib.sha256(payload).hexdigest()
           if expected and digest != expected:
               raise SystemExit(f'SHA-256 mismatch: expected {expected}, got {digest}')
