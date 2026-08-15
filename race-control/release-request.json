@@ -1,7 +1,6 @@
 {
-  "version": "0.2.9",
-  "filename": "MXB_Race_Day_Live_v0_2_9_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.2.9: Find a Race now uses exact, build-verified MX Bikes Shop artwork for every seeded race venue. No fuzzy matching, mirror source, product-page scraping, or random fallback remains. Old track-image cache is cleared, and the known-good updater/restart path is preserved.",
-  "builder_script": "race-control/build_v029_mxbshop_verified_v2.py",
-  "verification_attempt": 2
+  "version": "0.3.0",
+  "filename": "MXB_Race_Day_Live_v0_3_0_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.3.0: Low Entry races are now $3 at every skill level so riders can race for only a few dollars, while Cash and Premier races keep their higher stakes. Existing installs migrate automatically without duplicate race cards, and the verified MX Bikes Shop artwork plus the working updater/restart path are preserved.",
+  "builder_script": "race-control/build_v030_entry_fees.py"
 }
