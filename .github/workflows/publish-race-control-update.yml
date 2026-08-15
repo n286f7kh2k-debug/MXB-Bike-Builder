@@ -19,11 +19,16 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import base64, hashlib, json
+          import base64, hashlib, json, subprocess, sys
           from pathlib import Path
 
           req_path = Path('race-control/release-request.json')
           req = json.loads(req_path.read_text(encoding='utf-8'))
+          builder = str(req.get('builder_script') or '').strip()
+          if builder:
+              subprocess.run([sys.executable, builder], check=True)
+              raise SystemExit(0)
+
           version = str(req['version']).strip()
           chunks = req['chunks']
           filename = req.get('filename') or f"MXB_Race_Control_v{version.replace('.', '_')}_UPDATE.zip"
