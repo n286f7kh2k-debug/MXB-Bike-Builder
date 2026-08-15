@@ -2,7 +2,7 @@
   "version": "0.2.4",
   "filename": "MXB_Race_Day_Live_v0_2_4_UPDATE.zip",
   "sha256": "d146e6fe3a93a9ef52818166b1e9e418c01d5d00dbf7cdf378178231e0c9f1fc",
-  "notes": "MXB Race Day Live v0.2.4: fixes live update discovery so the Update button can find newly published versions without restarting the app first, and includes the latest My Profile page changes.",
+  "notes": "MXB Race Day Live v0.2.4: fixes live update discovery so the Update button can find newly published versions without restarting the app first, and includes the latest My Profile page changes. Release retry with corrected staging chunk.",
   "chunks": [
     "race-control/staging/v0_2_4/chunk00.b64",
     "race-control/staging/v0_2_4/chunk01.b64",
