@@ -1,6 +1,6 @@
 {
   "version": "0.2.8",
   "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_8_UPDATE.zip",
-  "sha256": "84e5fb00cc5e06ea99a755ceed3b722751890a814614342b0d6f9b20b9590459",
-  "notes": "MXB Race Day Live v0.2.8: complete update package containing the working live updater and automatic restart path from v0.2.7, plus the corrected Find a Race track-image mapping and one-time stale-image cache reset."
+  "sha256": "826def3f20aa5206308d93e7aba380a25a8387e63423c84126efabe8e40d130c",
+  "notes": "MXB Race Day Live v0.2.8: complete update package containing the working live updater and automatic restart path from v0.2.7, the corrected Find a Race track-image mapping and stale-image cache reset, plus a fix that always re-enables the UPDATE button after an update error."
 }
