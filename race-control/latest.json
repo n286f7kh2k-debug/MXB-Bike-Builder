@@ -1,6 +1,6 @@
 {
-  "version": "0.2.9",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_9_UPDATE.zip",
-  "sha256": "f565250066a71befca586e087862b9e5e6f2c7248d5a12c2467c2a8e14b24ff5",
-  "notes": "MXB Race Day Live v0.2.9: Find a Race artwork now uses verified MX Bikes Shop products only. The six seeded venues are explicitly matched to their real MX Bikes Shop track releases; all fuzzy/mirror fallback matching is disabled, stale track thumbnails are cleared, and the working live updater, error recovery, and automatic restart path are preserved."
+  "version": "0.3.0",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_0_UPDATE.zip",
+  "sha256": "309858ee24f8b352605d678d00fa20668edab3728eeb0104e9ca443847b9079e",
+  "notes": "MXB Race Day Live v0.3.0: Low Entry races are now $3 at every skill level so riders can race for only a few dollars, while Cash and Premier races keep their higher stakes. Existing installs migrate automatically without duplicate race cards, and the verified MX Bikes Shop artwork plus the working updater/restart path are preserved."
 }
