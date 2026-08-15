@@ -1,6 +1,6 @@
 {
-  "version": "0.2.4",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_4_UPDATE.zip",
-  "sha256": "d146e6fe3a93a9ef52818166b1e9e418c01d5d00dbf7cdf378178231e0c9f1fc",
-  "notes": "MXB Race Day Live v0.2.4: fixes live update discovery so the Update button can find newly published versions without restarting the app first, and includes the latest My Profile page changes. Release retry with corrected staging chunk."
+  "version": "0.2.5",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_5_UPDATE.zip",
+  "sha256": "c1c16657c92fe9df4ec22befcc1b3e1a90812eb3deed78e2c140f6dd022080be",
+  "notes": "MXB Race Day Live v0.2.5: fixes Find a Race track media matching, removes incorrect gear/product imagery from track cards, maps current venues to track-specific sources, and clears stale cached track images."
 }
