@@ -1,12 +1,10 @@
 {
-  "version": "0.1.3",
-  "filename": "MXB_Race_Control_v0_1_3_UPDATE.zip",
-  "sha256": "37223430de3196e573b60264bd066d00155a6b62afcba925fa01eb3243d7d9c8",
-  "notes": "Adds a rider-first My Paddock profile header with profile picture, overall ranking badge, visible skill status and etiquette ranking. Splits Rookie and Amateur championships into 250 C/450 C and 250 B/450 B, and renames Expert/Pro championship classes to 250 Pro/450 Pro for both MX and SX.",
+  "version": "0.2.0",
+  "filename": "MXB_Race_Day_Live_v0_2_0_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.2.0: renamed app, hidden Windows launcher, MX Bikes integration foundation, championship and event drill-down, track media support, profile and wallet redesign foundation, and updater reliability fixes.",
   "chunks": [
-    "race-control/staging/v0_1_3/chunk00.b64",
-    "race-control/staging/v0_1_3/chunk01.b64",
-    "race-control/staging/v0_1_3/chunk02.b64",
-    "race-control/staging/v0_1_3/chunk03.b64"
+    "race-control/staging/v0_2_0_hotfix/chunk00.b64",
+    "race-control/staging/v0_2_0_hotfix/chunk01.b64",
+    "race-control/staging/v0_2_0_hotfix/chunk02.b64"
   ]
 }
