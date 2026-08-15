@@ -1,6 +1,7 @@
 {
   "version": "0.2.9",
   "filename": "MXB_Race_Day_Live_v0_2_9_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.2.9: Find a Race now uses exact, build-verified MX Bikes Shop artwork for every seeded race venue. No fuzzy matching, mirror source, product-page scraping, or random fallback remains. Old track-image cache is cleared, and the working updater/restart path is preserved.",
-  "builder_script": "race-control/build_v029_mxbshop_verified.py"
+  "notes": "MXB Race Day Live v0.2.9: Find a Race now uses exact, build-verified MX Bikes Shop artwork for every seeded race venue. No fuzzy matching, mirror source, product-page scraping, or random fallback remains. Old track-image cache is cleared, and the known-good updater/restart path is preserved.",
+  "builder_script": "race-control/build_v029_mxbshop_verified_v2.py",
+  "verification_attempt": 2
 }
