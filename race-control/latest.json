@@ -1,6 +1,6 @@
 {
-  "version": "0.2.8",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_8_UPDATE.zip",
-  "sha256": "826def3f20aa5206308d93e7aba380a25a8387e63423c84126efabe8e40d130c",
-  "notes": "MXB Race Day Live v0.2.8: complete update package containing the working live updater and automatic restart path from v0.2.7, the corrected Find a Race track-image mapping and stale-image cache reset, plus a fix that always re-enables the UPDATE button after an update error."
+  "version": "0.2.9",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_9_UPDATE.zip",
+  "sha256": "f565250066a71befca586e087862b9e5e6f2c7248d5a12c2467c2a8e14b24ff5",
+  "notes": "MXB Race Day Live v0.2.9: Find a Race artwork now uses verified MX Bikes Shop products only. The six seeded venues are explicitly matched to their real MX Bikes Shop track releases; all fuzzy/mirror fallback matching is disabled, stale track thumbnails are cleared, and the working live updater, error recovery, and automatic restart path are preserved."
 }
