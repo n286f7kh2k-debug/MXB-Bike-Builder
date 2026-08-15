@@ -1,6 +1,6 @@
 {
-  "version": "0.3.0",
-  "filename": "MXB_Race_Day_Live_v0_3_0_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.3.0: Low Entry races are now $3 at every skill level so riders can race for only a few dollars, while Cash and Premier races keep their higher stakes. Existing installs migrate automatically without duplicate race cards, and the verified MX Bikes Shop artwork plus the working updater/restart path are preserved.",
-  "builder_script": "race-control/build_v030_entry_fees.py"
+  "version": "0.3.1",
+  "filename": "MXB_Race_Day_Live_v0_3_1_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.3.1: Community race cards on Find a Race now show the minimum valid purse and fastest-lap pool instead of $0 before enough riders have entered. The displayed amount grows with paid entries, while $3 Community pricing, verified MX Bikes Shop artwork, the in-app updater, and automatic restart are preserved.",
+  "builder_script": "race-control/build_v031_community_purse.py"
 }
