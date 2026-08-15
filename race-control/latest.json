@@ -1,6 +1,6 @@
 {
-  "version": "0.2.5",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_5_UPDATE.zip",
-  "sha256": "c1c16657c92fe9df4ec22befcc1b3e1a90812eb3deed78e2c140f6dd022080be",
-  "notes": "MXB Race Day Live v0.2.5: fixes Find a Race track media matching, removes incorrect gear/product imagery from track cards, maps current venues to track-specific sources, and clears stale cached track images."
+  "version": "0.2.6",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_6_UPDATE.zip",
+  "sha256": "dc4e3f03da3a69e6728be41b907d188544a9c9cc9a0222bc25dac09e9ef57342",
+  "notes": "MXB Race Day Live v0.2.6: replaces raw GitHub manifest checks with the GitHub Contents API to prevent stale update results, keeps the raw feed only as a fallback, includes the Find a Race track-image fixes, and uses the corrected release publisher."
 }
