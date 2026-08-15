@@ -1,6 +1,6 @@
 {
-  "version": "0.2.6",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_6_UPDATE.zip",
-  "sha256": "dc4e3f03da3a69e6728be41b907d188544a9c9cc9a0222bc25dac09e9ef57342",
-  "notes": "MXB Race Day Live v0.2.6: replaces raw GitHub manifest checks with the GitHub Contents API to prevent stale update results, keeps the raw feed only as a fallback, includes the Find a Race track-image fixes, and uses the corrected release publisher."
+  "version": "0.2.7",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_2_7_UPDATE.zip",
+  "sha256": "7c828eabe2ef317303be6bbdb62531b3d11a1202bc11fe86268b9d9ea9883665",
+  "notes": "MXB Race Day Live v0.2.7: fixes automatic restart after an in-app update with a delayed launcher and detached restart watchdog, while preserving the live GitHub API update check."
 }
