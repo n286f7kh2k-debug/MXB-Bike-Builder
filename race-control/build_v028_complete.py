@@ -33,10 +33,13 @@ if init.exists():
     s = init.read_text(encoding='utf-8')
     s = re.sub(r"__version__\s*=\s*['\"][^'\"]+['\"]", "__version__ = '0.2.8'", s)
     init.write_text(s, encoding='utf-8')
+else:
+    init.write_text("__version__ = '0.2.8'\n", encoding='utf-8')
 
+# Match the updater's real package requirements, then verify our additional files.
 required = [
     'app.py', 'src/app.py', 'src/config.py', 'src/updater.py',
-    'src/track_media.py', 'src/__init__.py', 'Start MXB Race Day Live.vbs'
+    'src/track_media.py', 'Start MXB Race Day Live.vbs'
 ]
 for rel in required:
     if not (work / rel).exists():
@@ -70,6 +73,8 @@ with zipfile.ZipFile(new_zip) as z:
     missing = [rel for rel in required if rel not in names]
     if missing:
         raise SystemExit('Final ZIP incomplete: ' + ', '.join(missing))
+    if 'src/__init__.py' not in names:
+        raise SystemExit('Final ZIP missing generated version marker')
 
 shutil.move(str(new_zip), str(OUT))
 digest = hashlib.sha256(OUT.read_bytes()).hexdigest()
