@@ -2,5 +2,6 @@
   "version": "0.2.8",
   "filename": "MXB_Race_Day_Live_v0_2_8_UPDATE.zip",
   "notes": "MXB Race Day Live v0.2.8: complete package preserving the working live updater and automatic restart path from v0.2.7, plus the corrected Find a Race track-image mappings and stale-image cache reset.",
-  "builder_script": "race-control/build_v028_complete.py"
+  "builder_script": "race-control/build_v028_complete.py",
+  "rebuild_attempt": 2
 }
