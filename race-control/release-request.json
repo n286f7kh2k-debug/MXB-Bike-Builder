@@ -1,18 +1,11 @@
 {
-  "version": "0.2.7",
-  "filename": "MXB_Race_Day_Live_v0_2_7_UPDATE.zip",
-  "sha256": "7c828eabe2ef317303be6bbdb62531b3d11a1202bc11fe86268b9d9ea9883665",
-  "notes": "MXB Race Day Live v0.2.7: fixes automatic restart after an in-app update with a delayed launcher and detached restart watchdog, while preserving the live GitHub API update check.",
+  "version": "0.2.8",
+  "filename": "MXB_Race_Day_Live_v0_2_8_UPDATE.zip",
+  "sha256": "fd92015d269bc789cc2077bb6ef23d4666292f3286c2f9fefd32b0197a465df1",
+  "notes": "MXB Race Day Live v0.2.8: fixes Find a Race track artwork by using explicit venue-to-track mappings for Millville/Spring Creek, RedBud/Buchanan, Fox Raceway/Pala, Anaheim 1, and San Diego, rejects random gear/product matches, and clears the old track-image cache once so incorrect images cannot persist.",
   "chunks": [
-    "race-control/staging/v0_2_7_clean/chunk00.b64",
-    "race-control/staging/v0_2_7_clean/chunk01.b64",
-    "race-control/staging/v0_2_7_clean/chunk02.b64",
-    "race-control/staging/v0_2_7_clean/chunk03.b64",
-    "race-control/staging/v0_2_7_clean/chunk04.b64",
-    "race-control/staging/v0_2_7_clean/chunk05.b64",
-    "race-control/staging/v0_2_7_clean/chunk06.b64",
-    "race-control/staging/v0_2_7_clean/chunk07.b64",
-    "race-control/staging/v0_2_7_clean/chunk08.b64",
-    "race-control/staging/v0_2_7_clean/chunk09.b64"
+    "race-control/staging/v0_2_8/chunk00.b64",
+    "race-control/staging/v0_2_8/chunk01.b64",
+    "race-control/staging/v0_2_8/chunk02.b64"
   ]
 }
