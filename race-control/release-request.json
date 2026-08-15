@@ -1,5 +1,5 @@
 {
   "version": "0.2.7",
-  "builder_script": "race-control/build_v027.py",
+  "builder_script": "race-control/build_v027_unzip.py",
   "notes": "MXB Race Day Live v0.2.7: fixes automatic restart after an in-app update, adds a delayed Windows launcher and detached restart watchdog, and closes the GUI cleanly on the main thread."
 }
