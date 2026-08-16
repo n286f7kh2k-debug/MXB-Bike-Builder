@@ -1,0 +1,74 @@
+name: Apply v1.0.17 Reference Theme
+
+on:
+  push:
+    branches: [ native-rebuild ]
+    paths:
+      - '.github/workflows/apply-v1017-visual-theme.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+
+      - name: Apply theme-only visual patch
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs')
+          s = path.read_text(encoding='utf-8')
+
+          def rep(old, new, count=-1):
+              global s
+              if old not in s:
+                  raise SystemExit('Expected theme anchor not found: ' + old[:120])
+              s = s.replace(old, new, count)
+
+          # Put the supplied reference artwork into the EXISTING profile banner without moving anything.
+          rep('''        bannerGrid.Children.Add(heroIdentity);\n        profileStack.Children.Add(banner);''', '''        bannerGrid.Children.Add(heroIdentity);\n\n        // Reference-exact hero artwork sits on top of the old procedural art.\n        // This changes only the skin; banner size and page geometry stay untouched.\n        bannerGrid.Children.Add(new Rectangle\n        {\n            Fill = ThemeArt.HeaderBrush(),\n            Opacity = 1.0,\n            IsHitTestVisible = false\n        });\n        profileStack.Children.Add(banner);''', 1)
+
+          # Image-backed existing Settings card.
+          rep('''        var root = new Grid { Background = FeatureCardBackground("#0B3150", "#06131F") };\n        root.Children.Add(new Polygon''', '''        var root = new Grid { Background = ThemeArt.LiveBrush() };\n        root.Children.Add(new Rectangle\n        {\n            Fill = Brush("#A904111D"),\n            IsHitTestVisible = false\n        });\n        root.Children.Add(new Polygon''', 1)
+
+          # Image-backed existing Garage card.
+          rep('''        var root = new Grid { Background = FeatureCardBackground("#0B3557", "#040F19") };\n        card.Child = root;\n        root.Children.Add(new Polygon''', '''        var root = new Grid { Background = ThemeArt.RiderBrush() };\n        card.Child = root;\n        root.Children.Add(new Rectangle\n        {\n            Fill = Brush("#9A03111D"),\n            IsHitTestVisible = false\n        });\n        root.Children.Add(new Polygon''', 1)
+
+          # Existing sub-page header gets the LIVE portion of the reference art.
+          rep('''            Background = new LinearGradientBrush(Color("#071E30"), Color("#030D17"), 0),\n            BorderBrush = Brush("#0A75AE"),''', '''            Background = ThemeArt.LiveBrush(),\n            BorderBrush = Brush("#00BFFF"),''', 1)
+          rep('''        top.Child = grid;\n\n        var back = new Button''', '''        top.Child = grid;\n        grid.Children.Add(new Rectangle\n        {\n            Fill = Brush("#B2040E18"),\n            IsHitTestVisible = false\n        });\n\n        var back = new Button''', 1)
+
+          # More saturated game-HUD borders while keeping all card dimensions unchanged.
+          rep('''        BorderBrush = Brush("#0B6B9F"),\n        BorderThickness = new Thickness(1.25),\n        CornerRadius = new CornerRadius(11),\n        Margin = margin,\n        Effect = Glow("#0066A4", 18, 0.24),''', '''        BorderBrush = Brush("#00AFFF"),\n        BorderThickness = new Thickness(1.55),\n        CornerRadius = new CornerRadius(11),\n        Margin = margin,\n        Effect = Glow("#008CFF", 22, 0.36),''', 1)
+
+          rep('''        brush.GradientStops.Add(new GradientStop(Color("#0A2132"), 0.00));\n        brush.GradientStops.Add(new GradientStop(Color("#061521"), 0.52));\n        brush.GradientStops.Add(new GradientStop(Color("#020A11"), 1.00));''', '''        brush.GradientStops.Add(new GradientStop(Color("#0B2B45"), 0.00));\n        brush.GradientStops.Add(new GradientStop(Color("#06192A"), 0.48));\n        brush.GradientStops.Add(new GradientStop(Color("#01070D"), 1.00));''', 1)
+
+          rep('''        brush.GradientStops.Add(new GradientStop(Color(top), 0.00));\n        brush.GradientStops.Add(new GradientStop(Color("#071724"), 0.48));\n        brush.GradientStops.Add(new GradientStop(Color(bottom), 1.00));''', '''        brush.GradientStops.Add(new GradientStop(Color(top), 0.00));\n        brush.GradientStops.Add(new GradientStop(Color("#073252"), 0.34));\n        brush.GradientStops.Add(new GradientStop(Color("#061522"), 0.66));\n        brush.GradientStops.Add(new GradientStop(Color(bottom), 1.00));''', 1)
+
+          # Add the reference art as a faint cinematic backdrop behind ALL existing pages.
+          rep('''        var canvas = new Canvas { IsHitTestVisible = false, Opacity = 1.0 };\n        Panel.SetZIndex(canvas, -10);\n\n        var glow = new Ellipse''', '''        var canvas = new Canvas { IsHitTestVisible = false, Opacity = 1.0 };\n        Panel.SetZIndex(canvas, -10);\n\n        var themeBackdrop = new Rectangle\n        {\n            Width = 1600,\n            Height = 360,\n            Fill = ThemeArt.HeaderBrush(),\n            Opacity = 0.20,\n            Effect = new BlurEffect { Radius = 10 }\n        };\n        Canvas.SetLeft(themeBackdrop, 0);\n        Canvas.SetTop(themeBackdrop, -70);\n        canvas.Children.Add(themeBackdrop);\n\n        var glow = new Ellipse''', 1)
+
+          # Selected bike tile gets a real image treatment, without changing its size or behavior.
+          rep('''            Background = selected ? new LinearGradientBrush(Color("#0C3F61"), Color("#061522"), 40) : PanelBackground(),''', '''            Background = selected ? ThemeArt.RiderBrush() : PanelBackground(),''', 1)
+
+          path.write_text(s, encoding='utf-8')
+
+          proj = Path('native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj')
+          p = proj.read_text(encoding='utf-8')
+          if '<Version>1.0.16</Version>' not in p:
+              raise SystemExit('Expected v1.0.16 project version not found')
+          proj.write_text(p.replace('<Version>1.0.16</Version>', '<Version>1.0.17</Version>', 1), encoding='utf-8')
+
+      - name: Commit theme
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          git commit -m "Apply reference-image theme skin v1.0.17 [skip ci]"
+          git push origin native-rebuild
