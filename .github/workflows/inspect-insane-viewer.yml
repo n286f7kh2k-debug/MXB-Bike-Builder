@@ -1,0 +1,49 @@
+name: Inspect iNsane 3D Viewer package
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/inspect-insane-viewer.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: windows-latest
+    steps:
+      - name: Download official public viewer package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $url = 'https://mxb-mods.com/uploads/3DViewer/dmkrtz3DViewer_v1.0.9151.32085.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile viewer.zip
+          Write-Host "Downloaded $((Get-Item viewer.zip).Length) bytes"
+
+      - name: Inventory package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Expand-Archive -Path viewer.zip -DestinationPath viewer -Force
+          Write-Host '=== TOP LEVEL ==='
+          Get-ChildItem viewer | Sort-Object Name | ForEach-Object { Write-Host ("{0}\t{1}\t{2}" -f $_.Mode,$_.Length,$_.Name) }
+          Write-Host '=== EXECUTABLES ==='
+          Get-ChildItem viewer -Recurse -File -Include *.exe,*.dll | Sort-Object FullName | ForEach-Object { Write-Host ("{0}\t{1}" -f $_.Length,$_.FullName) }
+          Write-Host '=== MODEL-LIKE ASSETS ==='
+          $assets = Get-ChildItem viewer -Recurse -File | Where-Object { $_.Extension -match '^\.(model|obj|fbx|gltf|glb|json|xml|bin)$' } | Sort-Object FullName
+          if (!$assets) { Write-Host 'NO MODEL-LIKE ASSETS FOUND IN ZIP' }
+          foreach ($f in $assets) {
+            $bytes = [System.IO.File]::ReadAllBytes($f.FullName)
+            $take = [Math]::Min(32, $bytes.Length)
+            $hex = if ($take -gt 0) { [Convert]::ToHexString($bytes[0..($take-1)]).ToLowerInvariant() } else { '' }
+            Write-Host ("{0}\t{1}\tmagic={2}" -f $f.Length,$f.FullName,$hex)
+          }
+
+      - name: Inventory URLs and config-like files
+        shell: pwsh
+        run: |
+          Get-ChildItem viewer -Recurse -File | Where-Object { $_.Extension -match '^\.(json|config|ini|xml|txt)$' } | Sort-Object FullName | ForEach-Object {
+            Write-Host "=== $($_.FullName) ==="
+            try { Get-Content $_.FullName -TotalCount 80 } catch { Write-Host '<binary/unreadable>' }
+          }
