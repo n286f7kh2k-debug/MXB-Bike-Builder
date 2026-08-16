@@ -1,7 +1,7 @@
 {
   "version": "0.5.14",
   "filename": "MXB_Race_Day_Live_v0_5_14_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.14 is an emergency startup recovery release for the v0.5.13 host regression. It preserves the v0.5.13 profile-first race-night UI and all app data/features, restores the last known-good external pythonw launch model, strips inherited PyInstaller parent-process state before launching the runtime, removes the frozen-host Tkinter failure path, and restores the earlier stable shell/AppUserModelID handling. Garage/model fixes are intentionally paused until startup is stable again.",
+  "notes": "MXB Race Day Live v0.5.14 is an emergency startup recovery release for the v0.5.13 host regression. It preserves the v0.5.13 profile-first race-night UI and all app data/features, restores the last known-good external pythonw launch model, strips inherited PyInstaller parent-process state before launching the runtime, removes the frozen-host Tkinter failure path, and restores the earlier stable shell/AppUserModelID handling. A standalone Recovery EXE is also published so a broken v0.5.13 install can repair itself without opening the app. Garage/model fixes are intentionally paused until startup is stable again.",
   "builder_script": "race-control/build_v0514_startup_recovery.py",
-  "build_attempt": 1
+  "build_attempt": 2
 }
