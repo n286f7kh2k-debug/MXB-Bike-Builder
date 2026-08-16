@@ -34,6 +34,13 @@ jobs:
           foreach($rel in @('Services\RiderGearSetStore.cs','Monetization\ProjectFingerprintService.cs','Services\ObjUvMeshLoader.cs','Services\IGearPreviewModelService.cs','Services\OfficialMxBikesPreviewModelService.cs','PaintCreatorModuleEntry.cs')){EnsureUsing (Join-Path $moduleRoot $rel) 'using System.IO;'}
           EnsureUsing (Join-Path $moduleRoot 'Services\OfficialMxBikesPreviewModelService.cs') 'using System.Net.Http;'
           $adapter=Join-Path $moduleRoot 'HostEntitlementAdapter.cs';$at=Get-Content -Raw $adapter;$at=$at.Replace('r.DesignName','r.ProjectName');Set-Content $adapter $at -Encoding utf8
+          $demoRoot=Join-Path $src 'src\MXBRaceDayLive.PaintCreator.Demo'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorHotUpdateService.cs') 'using System.Net.Http;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorHotUpdateService.cs') 'using System.IO;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleLoadContext.cs') 'using System.IO;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleSession.cs') 'using System.IO;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleSession.cs') 'using System.Threading;'
+          EnsureUsing (Join-Path $demoRoot 'MainWindow.xaml.cs') 'using System.IO;'
           "SRC=$src" >> $env:GITHUB_ENV
       - name: Validate MXB Hub style flow
         shell: pwsh
