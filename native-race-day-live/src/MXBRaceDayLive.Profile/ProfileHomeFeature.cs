@@ -133,8 +133,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             Foreground = Brush("#F7FBFF"),
             FontFamily = new FontFamily("Segoe UI Black"),
             FontStyle = FontStyles.Italic,
-            FontSize = 44,
-            CharacterSpacing = -25
+            FontSize = 44
         });
         var liveRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, -8, 0, 0) };
         liveRow.Children.Add(new TextBlock
