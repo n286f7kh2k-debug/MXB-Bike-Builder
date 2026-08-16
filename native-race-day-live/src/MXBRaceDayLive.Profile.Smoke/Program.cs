@@ -5,15 +5,36 @@ using MXBRaceDayLive.Profile;
 
 internal static class Program
 {
-    [STAThread]
-    private static async Task<int> Main()
+    private static int Main()
+    {
+        Exception? failure = null;
+        var exitCode = 1;
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                exitCode = RunAsync().GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.Start();
+        thread.Join();
+        if (failure is not null) throw failure;
+        return exitCode;
+    }
+
+    private static async Task<int> RunAsync()
     {
         var temp = Path.Combine(Path.GetTempPath(), "mxb-rdl-profile-smoke-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(temp);
         Directory.CreateDirectory(Path.Combine(temp, "mods"));
         Directory.CreateDirectory(Path.Combine(temp, "profiles", "Smoke"));
         var profileIni = Path.Combine(temp, "profiles", "Smoke", "profile.ini");
-        await File.WriteAllTextAsync(profileIni, "[info]\nbikeid = smoke_bike\npaint = smoke_paint\nrace_number = 311\n");
+        File.WriteAllText(profileIni, "[info]\nbikeid = smoke_bike\npaint = smoke_paint\nrace_number = 311\n");
 
         var app = new Application();
         try
