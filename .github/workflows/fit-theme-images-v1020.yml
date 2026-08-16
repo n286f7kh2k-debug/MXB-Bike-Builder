@@ -1,0 +1,85 @@
+name: Fit Theme Images v1.0.20
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/fit-theme-images-v1020.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout native rebuild
+        uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+          fetch-depth: 0
+
+      - name: Fit existing images inside their boxes
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          root = Path('native-race-day-live/src/MXBRaceDayLive.Profile')
+
+          theme_path = root / 'ThemeArt.cs'
+          theme = theme_path.read_text(encoding='utf-8')
+          old_theme = 'Stretch = Stretch.UniformToFill,'
+          if old_theme not in theme:
+              raise SystemExit('ThemeArt image stretch setting was not found')
+          theme = theme.replace(old_theme, 'Stretch = Stretch.Uniform,', 1)
+          theme_path.write_text(theme, encoding='utf-8')
+
+          profile_path = root / 'ProfileHomeFeature.cs'
+          profile = profile_path.read_text(encoding='utf-8')
+          old_profile = '''var brush = new ImageBrush(bitmap)
+            {
+                Stretch = Stretch.UniformToFill,
+                AlignmentX = AlignmentX.Center,
+                AlignmentY = AlignmentY.Center
+            };'''
+          new_profile = '''var brush = new ImageBrush(bitmap)
+            {
+                // Fit the complete image inside its existing UI box without stretching or
+                // clipping away the edges. The surrounding panel remains responsible for
+                // the box size, border, rounded corners, and background fill.
+                Stretch = Stretch.Uniform,
+                AlignmentX = AlignmentX.Center,
+                AlignmentY = AlignmentY.Center,
+                TileMode = TileMode.None
+            };'''
+          if old_profile not in profile:
+              raise SystemExit('Profile image brush block was not found')
+          profile = profile.replace(old_profile, new_profile, 1)
+          profile_path.write_text(profile, encoding='utf-8')
+
+          project_path = root / 'MXBRaceDayLive.Profile.csproj'
+          project = project_path.read_text(encoding='utf-8')
+          project = re.sub(r'<Version>[^<]+</Version>', '<Version>1.0.20</Version>', project, count=1)
+          project_path.write_text(project, encoding='utf-8')
+
+      - name: Verify image-fit patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q '<Version>1.0.20</Version>' native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          grep -q 'Stretch = Stretch.Uniform,' native-race-day-live/src/MXBRaceDayLive.Profile/ThemeArt.cs
+          grep -q 'TileMode = TileMode.None' native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
+
+      - name: Commit v1.0.20 image fit
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ThemeArt.cs \
+                  native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs \
+                  native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          git commit -m 'Fit theme images inside existing boxes and bump v1.0.20'
+          git push origin HEAD:native-rebuild
