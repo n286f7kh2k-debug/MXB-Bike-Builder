@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build-mxb-decoder:
+  build-mxb-binaries:
     runs-on: windows-latest
     steps:
       - name: Check out repository
@@ -20,40 +20,41 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Stage permanent shortcut icon
+      - name: Build branded in-process host
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          New-Item -ItemType Directory -Force -Path race-control/staging | Out-Null
-          $icon = 'race-control/launcher/mxb_race_day_live.ico'
-          if (-not (Test-Path $icon)) { throw 'MXB Race Day Live icon asset missing' }
-          Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
-
-      - name: Build branded launcher with PyInstaller
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          python -m pip install --disable-pip-version-check pyinstaller
           $launcher = 'race-control/launcher/rdl_launcher.py'
           $version = 'race-control/launcher/version_info.txt'
-          foreach ($p in @($launcher,$version)) {
+          $icon = 'race-control/launcher/mxb_race_day_live.ico'
+          foreach ($p in @($launcher,$version,$icon)) {
             if (-not (Test-Path $p)) { throw "missing launcher input: $p" }
           }
+          New-Item -ItemType Directory -Force -Path race-control/staging | Out-Null
+          python -m pip install --disable-pip-version-check pyinstaller pillow
           Remove-Item 'race-control/staging/MXB Race Day Live.exe' -Force -ErrorAction SilentlyContinue
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name 'MXB Race Day Live' --version-file $version --distpath race-control/staging $launcher
+          python -m PyInstaller --noconfirm --clean --onefile --windowed `
+            --name 'MXB Race Day Live' `
+            --version-file $version `
+            --icon $icon `
+            --distpath race-control/staging `
+            $launcher
           if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
-          if (-not (Test-Path 'race-control/staging/MXB Race Day Live.exe')) { throw 'branded launcher output missing' }
+          if (-not (Test-Path 'race-control/staging/MXB Race Day Live.exe')) { throw 'branded host output missing' }
+          Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
 
-      - name: Validate branded launcher identity
+      - name: Validate branded host identity
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $out = 'race-control/staging/MXB Race Day Live.exe'
           $vi = (Get-Item $out).VersionInfo
           Write-Host "ProductName=$($vi.ProductName) FileDescription=$($vi.FileDescription) OriginalFilename=$($vi.OriginalFilename) FileVersion=$($vi.FileVersion)"
-          if ($vi.ProductName -ne 'MXB Race Day Live') { throw "launcher ProductName incorrect: '$($vi.ProductName)'" }
-          if ($vi.OriginalFilename -ne 'MXB Race Day Live.exe') { throw "launcher OriginalFilename incorrect: '$($vi.OriginalFilename)'" }
-          if ($vi.FileDescription -ne 'MXB Race Day Live') { throw "launcher FileDescription incorrect: '$($vi.FileDescription)'" }
+          if ($vi.ProductName -ne 'MXB Race Day Live') { throw "ProductName incorrect: '$($vi.ProductName)'" }
+          if ($vi.OriginalFilename -ne 'MXB Race Day Live.exe') { throw "OriginalFilename incorrect: '$($vi.OriginalFilename)'" }
+          if ($vi.FileDescription -ne 'MXB Race Day Live') { throw "FileDescription incorrect: '$($vi.FileDescription)'" }
+          $bytes = [System.IO.File]::ReadAllBytes($out)
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw 'branded host is not a Windows PE executable' }
 
       - name: Fetch pinned Frost EDF parser
         shell: pwsh
@@ -63,8 +64,6 @@ jobs:
           New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
           $url = 'https://raw.githubusercontent.com/Frostn1/mxb-app/2d3775a8d2931d2dd295f6211e0073293a805353/src-tauri/src/edf.rs'
           Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest
-          $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
-          Write-Host "Frost EDF source SHA256: $hash"
           if ((Get-Content $dest -Raw) -notmatch 'EDF\\0') { throw 'Pinned Frost EDF parser did not contain the EDF signature' }
 
       - name: Build native MXB asset decoder
@@ -86,7 +85,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    needs: build-mxb-decoder
+    needs: build-mxb-binaries
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -104,45 +103,28 @@ jobs:
           python - <<'PY'
           import base64, hashlib, json, subprocess, sys
           from pathlib import Path
-
-          req_path = Path('race-control/release-request.json')
-          req = json.loads(req_path.read_text(encoding='utf-8'))
+          req = json.loads(Path('race-control/release-request.json').read_text(encoding='utf-8'))
           builder = str(req.get('builder_script') or '').strip()
           if builder:
               subprocess.run([sys.executable, builder], check=True)
-              raise SystemExit(0)
-
-          version = str(req['version']).strip()
-          chunks = req['chunks']
-          filename = req.get('filename') or f"MXB_Race_Control_v{version.replace('.', '_')}_UPDATE.zip"
-          expected = str(req.get('sha256', '')).strip().lower()
-          notes = str(req.get('notes', '')).strip()
-
-          chunk_texts = [Path(path).read_text(encoding='ascii').strip() for path in chunks]
-          try:
-              encoded = ''.join(chunk_texts)
-              payload = base64.b64decode(encoded, validate=True)
-          except Exception:
-              payload = b''.join(base64.b64decode(chunk, validate=True) for chunk in chunk_texts)
-
-          digest = hashlib.sha256(payload).hexdigest()
-          if expected and digest != expected:
-              raise SystemExit(f'SHA-256 mismatch: expected {expected}, got {digest}')
-
-          outdir = Path('race-control/releases')
-          outdir.mkdir(parents=True, exist_ok=True)
-          outfile = outdir / filename
-          outfile.write_bytes(payload)
-
-          manifest = {
-              'version': version,
-              'url': f'https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/{filename}',
-              'sha256': digest,
-              'notes': notes,
-          }
-          Path('race-control/latest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
-          for path in chunks:
-              Path(path).unlink(missing_ok=True)
+          else:
+              version = str(req['version']).strip()
+              filename = req.get('filename') or f"MXB_Race_Control_v{version.replace('.', '_')}_UPDATE.zip"
+              chunks = req['chunks']
+              payload = base64.b64decode(''.join(Path(x).read_text(encoding='ascii').strip() for x in chunks), validate=True)
+              expected = str(req.get('sha256', '')).strip().lower()
+              digest = hashlib.sha256(payload).hexdigest()
+              if expected and expected != digest:
+                  raise SystemExit(f'SHA-256 mismatch: expected {expected}, got {digest}')
+              out = Path('race-control/releases') / filename
+              out.parent.mkdir(parents=True, exist_ok=True)
+              out.write_bytes(payload)
+              Path('race-control/latest.json').write_text(json.dumps({
+                  'version': version,
+                  'url': f'https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/{filename}',
+                  'sha256': digest,
+                  'notes': str(req.get('notes', '')).strip(),
+              }, indent=2) + '\n', encoding='utf-8')
           PY
 
       - name: Publish release through GitHub API
@@ -151,14 +133,8 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           python - <<'PY'
-          import base64
-          import json
-          import os
-          import time
-          import urllib.error
-          import urllib.request
+          import base64, json, os, time, urllib.error, urllib.request
           from pathlib import Path
-
           repo = os.environ['GITHUB_REPOSITORY']
           token = os.environ['GH_TOKEN']
           api = f'https://api.github.com/repos/{repo}'
@@ -167,18 +143,13 @@ jobs:
           filename = str(request.get('filename') or f"MXB_Race_Control_v{version.replace('.', '_')}_UPDATE.zip")
           release_path = f'race-control/releases/{filename}'
           manifest_path = 'race-control/latest.json'
-          release = Path(release_path)
-          manifest = Path(manifest_path)
+          release, manifest = Path(release_path), Path(manifest_path)
           if not release.is_file() or not manifest.is_file():
               raise SystemExit(f'assembled release files are missing for v{version}: {release_path}')
-
           headers = {
-              'Authorization': f'Bearer {token}',
-              'Accept': 'application/vnd.github+json',
-              'X-GitHub-Api-Version': '2022-11-28',
-              'User-Agent': 'MXB-Race-Day-Live-Release-Bot',
+              'Authorization': f'Bearer {token}', 'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28', 'User-Agent': 'MXB-Race-Day-Live-Release-Bot',
           }
-
           def call(method, path, payload=None):
               data = None if payload is None else json.dumps(payload).encode('utf-8')
               req = urllib.request.Request(api + path, data=data, headers=headers, method=method)
@@ -187,43 +158,21 @@ jobs:
                       body = response.read()
                       return json.loads(body.decode('utf-8')) if body else {}
               except urllib.error.HTTPError as exc:
-                  detail = exc.read().decode('utf-8', 'replace')
-                  raise RuntimeError(f'GitHub API {method} {path} failed: {exc.code} {detail}') from exc
-
-          release_blob = call('POST', '/git/blobs', {
-              'content': base64.b64encode(release.read_bytes()).decode('ascii'),
-              'encoding': 'base64',
-          })['sha']
-          manifest_blob = call('POST', '/git/blobs', {
-              'content': manifest.read_text(encoding='utf-8'),
-              'encoding': 'utf-8',
-          })['sha']
-
+                  raise RuntimeError(f'GitHub API {method} {path} failed: {exc.code} {exc.read().decode("utf-8", "replace")}') from exc
           entries = [
-              {'path': release_path, 'mode': '100644', 'type': 'blob', 'sha': release_blob},
-              {'path': manifest_path, 'mode': '100644', 'type': 'blob', 'sha': manifest_blob},
+              {'path': release_path, 'mode': '100644', 'type': 'blob', 'sha': call('POST','/git/blobs',{'content':base64.b64encode(release.read_bytes()).decode('ascii'),'encoding':'base64'})['sha']},
+              {'path': manifest_path, 'mode': '100644', 'type': 'blob', 'sha': call('POST','/git/blobs',{'content':manifest.read_text(encoding='utf-8'),'encoding':'utf-8'})['sha']},
           ]
-
-          last_error = None
           for attempt in range(1, 6):
               try:
-                  head = call('GET', '/git/ref/heads/main')['object']['sha']
-                  base_tree = call('GET', f'/git/commits/{head}')['tree']['sha']
-                  tree = call('POST', '/git/trees', {'base_tree': base_tree, 'tree': entries})['sha']
-                  commit = call('POST', '/git/commits', {
-                      'message': f'Publish MXB Race Control v{version}',
-                      'tree': tree,
-                      'parents': [head],
-                  })['sha']
-                  call('PATCH', '/git/refs/heads/main', {'sha': commit, 'force': False})
+                  head = call('GET','/git/ref/heads/main')['object']['sha']
+                  base_tree = call('GET',f'/git/commits/{head}')['tree']['sha']
+                  tree = call('POST','/git/trees',{'base_tree':base_tree,'tree':entries})['sha']
+                  commit = call('POST','/git/commits',{'message':f'Publish MXB Race Control v{version}','tree':tree,'parents':[head]})['sha']
+                  call('PATCH','/git/refs/heads/main',{'sha':commit,'force':False})
                   print(f'Published v{version} at commit {commit}')
                   break
-              except Exception as exc:
-                  last_error = exc
-                  if attempt == 5:
-                      raise
-                  print(f'Publish race on attempt {attempt}: {exc}; retrying against current main')
+              except Exception:
+                  if attempt == 5: raise
                   time.sleep(attempt * 2)
-          else:
-              raise last_error or RuntimeError('release publish failed')
           PY
