@@ -20,11 +20,11 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Build branded launcher and recovery tool
+      - name: Build branded native host and recovery tool
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $launcher = 'race-control/launcher/rdl_launcher.py'
+          $launcher = 'race-control/launcher/rdl_native_host.py'
           $recovery = 'race-control/recovery/rdl_recovery.py'
           $version = 'race-control/launcher/version_info.txt'
           $icon = 'race-control/launcher/mxb_race_day_live.ico'
@@ -39,20 +39,30 @@ jobs:
             --name 'MXB Race Day Live' `
             --version-file $version `
             --icon $icon `
+            --collect-submodules=tkinter `
+            --collect-submodules=PIL `
+            --hidden-import=_tkinter `
+            --hidden-import=tkinter.ttk `
+            --hidden-import=tkinter.messagebox `
+            --hidden-import=tkinter.filedialog `
+            --hidden-import=tkinter.colorchooser `
+            --hidden-import=tkinter.simpledialog `
+            --hidden-import=tkinter.font `
+            --hidden-import=tkinter.scrolledtext `
             --distpath race-control/staging `
             $launcher
-          if ($LASTEXITCODE -ne 0) { throw "launcher PyInstaller failed with exit code $LASTEXITCODE" }
+          if ($LASTEXITCODE -ne 0) { throw "native host PyInstaller failed with exit code $LASTEXITCODE" }
           python -m PyInstaller --noconfirm --clean --onefile --windowed `
             --name 'MXB Race Day Live Recovery' `
             --icon $icon `
             --distpath race-control/staging `
             $recovery
           if ($LASTEXITCODE -ne 0) { throw "recovery PyInstaller failed with exit code $LASTEXITCODE" }
-          if (-not (Test-Path 'race-control/staging/MXB Race Day Live.exe')) { throw 'branded launcher output missing' }
+          if (-not (Test-Path 'race-control/staging/MXB Race Day Live.exe')) { throw 'branded native host output missing' }
           if (-not (Test-Path 'race-control/staging/MXB Race Day Live Recovery.exe')) { throw 'recovery executable output missing' }
           Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
 
-      - name: Validate recovery binaries
+      - name: Validate branded host and startup imports
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -66,6 +76,8 @@ jobs:
             $bytes = [System.IO.File]::ReadAllBytes($p)
             if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw "$p is not a Windows PE executable" }
           }
+          $probe = Start-Process -FilePath $out -ArgumentList '--rdl-smoke-test' -Wait -PassThru
+          if ($probe.ExitCode -ne 0) { throw "branded host Tk/Pillow smoke test failed with exit code $($probe.ExitCode)" }
 
       - name: Fetch pinned Frost EDF parser
         shell: pwsh
