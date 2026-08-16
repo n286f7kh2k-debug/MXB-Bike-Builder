@@ -13,7 +13,11 @@ if old2 in src:
     src=src.replace(old2,new2,1)
 anchor="app=app.replace('NativeRendererError','GarageModelError')\np.write_text(app,encoding='utf-8')"
 patched="""app=app.replace('NativeRendererError','GarageModelError')
+app=app.replace('from .native_renderer import MXBNativeRenderer, GarageModelError','from .in_app_garage import InAppGarageRenderer, GarageModelError')
+app=app.replace('from .native_renderer import MXBNativeRenderer, NativeRendererError','from .in_app_garage import InAppGarageRenderer, GarageModelError')
 app=app.replace('self.native_renderer','self.garage_renderer')
+app=app.replace('native_renderer','garage_renderer')
+app=app.replace('MXBNativeRenderer','InAppGarageRenderer')
 app=app.replace('command=lambda:start_live_renderer(True)','command=lambda:draw_garage3d(True)')
 app=app.replace('start_live_renderer(False)','draw_garage3d(False)')
 app=re.sub(r\"render_host=tk\\.Frame\\(preview_wrap,bg='#050607',height=350,cursor='crosshair'\\); render_host\\.pack\\(fill='x',padx=1,pady=\\(0,1\\)\\); render_host\\.pack_propagate\\(False\\)\",\"render_host=tk.Canvas(preview_wrap,bg='#050607',height=350,highlightthickness=0,cursor='fleur'); render_host.pack(fill='x',padx=1,pady=(0,1))\",app,count=1)
@@ -25,7 +29,6 @@ p.write_text(app,encoding='utf-8')"""
 if anchor not in src:
     raise SystemExit('v0.3.9 stale renderer anchor missing')
 src=src.replace(anchor,patched,1)
-# Give every important assertion a name so CI reports the exact failed requirement.
 labels={
 "assert 'native_renderer' not in app.lower()":"assert 'native_renderer' not in app.lower(), 'gate:native_renderer_removed'",
 "assert 'MXBNativeRenderer' not in app and 'start_live_renderer' not in app":"assert 'MXBNativeRenderer' not in app and 'start_live_renderer' not in app, 'gate:legacy_renderer_callbacks_removed'",
