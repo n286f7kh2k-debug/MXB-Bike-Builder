@@ -1,6 +1,6 @@
 {
-  "version": "0.3.1",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_1_UPDATE.zip",
-  "sha256": "c9a4cde38c71c8bc958b459f652ba0028543e9b94d9f4763c69fdab56eef5461",
-  "notes": "MXB Race Day Live v0.3.1: Community race cards on Find a Race now show the minimum valid purse and fastest-lap pool instead of $0 before enough riders have entered. The displayed amount grows with paid entries, while $3 Community pricing, verified MX Bikes Shop artwork, the in-app updater, and automatic restart are preserved."
+  "version": "0.3.2",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_2_UPDATE.zip",
+  "sha256": "58589a67845b83294388211b5afb10cba259821c554ecbb771359b27db12ff13",
+  "notes": "MXB Race Day Live v0.3.2: adds automated rider memberships with Pit Pass, Race Pass and Factory Pass tiers, daily discounted Community-race allowances, automatic member wallet rebates, subscription status/usage tracking, and provider-ready recurring billing fields. Cash/Premier pricing, the $3 Community purse/fast-lap economics, verified MX Bikes Shop artwork, in-app updates and automatic restart are preserved."
 }
