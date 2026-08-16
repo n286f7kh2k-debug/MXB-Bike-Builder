@@ -1,7 +1,7 @@
 {
   "version": "0.5.3",
   "filename": "MXB_Race_Day_Live_v0_5_3_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.3: fixes the Windows taskbar icon at both the launcher and window levels. The desktop shortcut migrates to direct pythonw/app.py launching while preserving its exact IconLocation, EXE/DLL icon resource indexes are supported, the process AppUserModelID is set before Tk creates the taskbar button, and the icon is applied directly to the real HWND. v0.5.2 universal Garage, v0.5.1 performance fixes, updater/restart, race joining, memberships, wallet, purse/fastest-lap economics, track art, live timing and admin controls are preserved.",
-  "builder_script": "race-control/build_v053_taskbar_identity.py",
-  "rebuild_attempt": 1
+  "notes": "Inspection only for v0.5.3 runtime integration and updater architecture.",
+  "builder_script": "race-control/inspect_v053_extension_runtime.py",
+  "inspection_attempt": 1
 }
