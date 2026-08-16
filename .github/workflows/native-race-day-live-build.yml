@@ -4,13 +4,14 @@ on:
   push:
     branches: [native-rebuild]
     paths:
-      - 'native-race-day-live/**'
+      - 'native-race-day-live/src/**'
+      - 'native-race-day-live/README.md'
       - 'race-control/launcher/mxb_race_day_live.ico'
       - '.github/workflows/native-race-day-live-build.yml'
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-native-windows:
@@ -18,6 +19,8 @@ jobs:
     steps:
       - name: Checkout native rebuild
         uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
 
       - name: Set up .NET 8
         uses: actions/setup-dotnet@v4
@@ -62,6 +65,45 @@ jobs:
           if ((Get-Item $exe).Length -lt 100000) { throw 'Native executable is unexpectedly small' }
           Write-Host "Validated native executable: $($info.ProductName) v$($info.FileVersion)"
           Write-Host 'Python runtime is not part of this project or launch path.'
+
+      - name: Publish live profile update channel
+        if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+        shell: pwsh
+        run: |
+          $sourcePath = 'native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs'
+          $source = Get-Content $sourcePath -Raw
+          $match = [regex]::Match($source, 'public\s+Version\s+Version\s*=>\s*new\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)')
+          if (!$match.Success) { throw 'Could not determine profile module version from ProfileHomeFeature.cs' }
+          $version = "$($match.Groups[1].Value).$($match.Groups[2].Value).$($match.Groups[3].Value)"
+
+          $builtModule = 'native-out/profile-build/MXBRaceDayLive.Profile.dll'
+          $publishDir = "native-race-day-live/updates/modules/$version"
+          $publishModule = "$publishDir/MXBRaceDayLive.Profile.dll"
+          New-Item -ItemType Directory -Force -Path $publishDir | Out-Null
+          Copy-Item $builtModule $publishModule -Force
+
+          $sha = (Get-FileHash $publishModule -Algorithm SHA256).Hash.ToLowerInvariant()
+          $moduleUrl = "https://raw.githubusercontent.com/${{ github.repository }}/native-rebuild/native-race-day-live/updates/modules/$version/MXBRaceDayLive.Profile.dll"
+          $manifest = [ordered]@{
+            version = $version
+            moduleUrl = $moduleUrl
+            sha256 = $sha
+            featureAssembly = 'MXBRaceDayLive.Profile.dll'
+            notes = "MXB Race Day Live profile-home module v$version. Applies live inside the running native app without restarting the shell."
+          } | ConvertTo-Json
+          Set-Content -Path 'native-race-day-live/updates/latest.json' -Value $manifest -Encoding utf8
+
+          Write-Host "Publishing live module v$version"
+          Write-Host "SHA-256: $sha"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- 'native-race-day-live/updates/latest.json' 'native-race-day-live/updates/modules'
+          if (git diff --cached --quiet) {
+            Write-Host 'Live update channel is already current.'
+          } else {
+            git commit -m "Publish native profile module v$version [skip ci]"
+            git push origin HEAD:native-rebuild
+          }
 
       - name: Package checkpoint
         shell: pwsh
