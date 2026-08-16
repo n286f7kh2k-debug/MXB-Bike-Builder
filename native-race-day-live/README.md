@@ -17,7 +17,7 @@ Fresh native Windows rebuild. The previous Python-hosted application is intentio
 
 ## Theme direction
 
-The existing UI uses a race-night game-menu treatment: darker layered backgrounds, electric-blue accents, compact glowing borders, stronger hierarchy, and more aggressive motocross-style typography. Theme passes must restyle existing screens without adding product sections or functionality unless explicitly requested.
+The existing UI now uses a fixed game-dashboard composition rather than the old long vertical utility layout: left-side navigation, compact HUD modules, image-backed rider identity when profile images exist, electric-blue accents, compact glowing borders, stronger hierarchy, and aggressive motocross-style typography. Theme passes must restyle existing screens without adding product sections or functionality unless explicitly requested.
 
 ## First checkpoint
 
