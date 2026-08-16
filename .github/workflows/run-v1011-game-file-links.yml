@@ -1,0 +1,29 @@
+name: Run v1.0.11 Game File Links patch
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/run-v1011-game-file-links.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+      - name: Apply Game File Links patch
+        shell: pwsh
+        run: python .github/scripts/patch_v1011_game_file_links.py
+      - name: Commit Game File Links settings
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj native-race-day-live/src/MXBRaceDayLive.Profile/GameFileLinks.cs
+          git commit -m "Add Game File Links settings and manual Garage paths"
+          git push origin native-rebuild
