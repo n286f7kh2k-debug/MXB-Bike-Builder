@@ -26,7 +26,7 @@ jobs:
           if ($null -eq $fbx) { throw 'Official rider FBX not found' }
           "PROBE_ROOT=$root" >> $env:GITHUB_ENV
           "RIDER_FBX=$($fbx.FullName)" >> $env:GITHUB_ENV
-      - name: Create .NET importer probe
+      - name: Create .NET importer/exporter probe
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -36,36 +36,63 @@ jobs:
           dotnet add package HelixToolkit.SharpDX.Assimp --version 3.1.2
           @'
           using System.Reflection;
+          using System.Collections;
 
           var fbx = Environment.GetEnvironmentVariable("RIDER_FBX")!;
-          var assimpAsm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "HelixToolkit.SharpDX.Assimp")
-              ?? Assembly.Load("HelixToolkit.SharpDX.Assimp");
+          var assimpAsm = Assembly.Load("HelixToolkit.SharpDX.Assimp");
           Console.WriteLine($"ASSEMBLY {assimpAsm.FullName}");
-          foreach (var t in assimpAsm.GetTypes().Where(t => t.Name.Contains("Importer", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Scene", StringComparison.OrdinalIgnoreCase)).OrderBy(t => t.FullName))
-          {
-              Console.WriteLine($"TYPE {t.FullName}");
-              foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Where(m => m.Name.Contains("Load", StringComparison.OrdinalIgnoreCase) || m.Name.Contains("Import", StringComparison.OrdinalIgnoreCase)))
-                  Console.WriteLine("  METHOD " + m);
-          }
 
-          var importerType = assimpAsm.GetTypes().FirstOrDefault(t => t.Name == "Importer" && t.GetMethods().Any(m => m.Name == "Load"));
-          if (importerType is null) throw new Exception("Helix importer type not found");
+          var importerType = assimpAsm.GetTypes().First(t => t.Name == "Importer");
           var importer = Activator.CreateInstance(importerType)!;
-          var load = importerType.GetMethods().Where(m => m.Name == "Load").OrderBy(m => m.GetParameters().Length).FirstOrDefault(m => {
-              var p = m.GetParameters();
-              return p.Length >= 1 && p[0].ParameterType == typeof(string);
-          });
-          if (load is null) throw new Exception("String Load overload not found");
-          Console.WriteLine("SELECTED " + load);
-          var callArgs = load.GetParameters().Select((p,i) => i == 0 ? (object?)fbx : (p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null))).ToArray();
-          var scene = load.Invoke(importer, callArgs);
-          Console.WriteLine("LOAD_RESULT " + (scene?.GetType().FullName ?? "null"));
-          if (scene is null) throw new Exception("FBX load returned null");
-          foreach (var prop in scene.GetType().GetProperties(BindingFlags.Public|BindingFlags.Instance))
+          var load = importerType.GetMethod("Load", new[] { typeof(string) })!;
+          var scene = load.Invoke(importer, new object?[] { fbx })!;
+          Console.WriteLine("LOAD_RESULT " + scene.GetType().FullName);
+
+          var root = scene.GetType().GetProperty("Root")!.GetValue(scene)!;
+          void DumpNode(object node, int depth)
           {
-              object? value = null;
-              try { value = prop.GetValue(scene); } catch { }
-              Console.WriteLine($"SCENE_PROP {prop.Name} TYPE={prop.PropertyType.FullName} VALUE_TYPE={value?.GetType().FullName ?? "null"}");
+              var t = node.GetType();
+              var indent = new string(' ', depth * 2);
+              Console.WriteLine($"{indent}NODE {t.FullName}");
+              foreach (var p in t.GetProperties(BindingFlags.Public|BindingFlags.Instance))
+              {
+                  if (p.Name.Contains("Geometry", StringComparison.OrdinalIgnoreCase) || p.Name.Contains("Model", StringComparison.OrdinalIgnoreCase) || p.Name.Contains("Items", StringComparison.OrdinalIgnoreCase) || p.Name.Contains("Child", StringComparison.OrdinalIgnoreCase))
+                  {
+                      object? v = null; try { v = p.GetValue(node); } catch { }
+                      Console.WriteLine($"{indent}  PROP {p.Name} TYPE={p.PropertyType.FullName} VALUE={v?.GetType().FullName ?? "null"}");
+                      if (p.Name.Contains("Geometry", StringComparison.OrdinalIgnoreCase) && v != null)
+                      {
+                          foreach (var gp in v.GetType().GetProperties(BindingFlags.Public|BindingFlags.Instance))
+                          {
+                              if (gp.Name is "Positions" or "Indices" or "TextureCoordinates" or "Normals")
+                              {
+                                  object? gv = null; try { gv = gp.GetValue(v); } catch { }
+                                  int count = gv is ICollection c ? c.Count : -1;
+                                  Console.WriteLine($"{indent}    GEOM {gp.Name} TYPE={gp.PropertyType.FullName} COUNT={count}");
+                              }
+                          }
+                      }
+                  }
+              }
+
+              foreach (var p in t.GetProperties(BindingFlags.Public|BindingFlags.Instance))
+              {
+                  if (!(p.Name.Contains("Items", StringComparison.OrdinalIgnoreCase) || p.Name.Contains("Child", StringComparison.OrdinalIgnoreCase))) continue;
+                  object? v = null; try { v = p.GetValue(node); } catch { }
+                  if (v is IEnumerable seq && v is not string)
+                  {
+                      foreach (var child in seq) if (child != null && child.GetType().Name.Contains("Node")) DumpNode(child, depth + 1);
+                  }
+              }
+          }
+          DumpNode(root, 0);
+
+          var exporterType = assimpAsm.GetTypes().FirstOrDefault(t => t.Name == "Exporter");
+          Console.WriteLine("EXPORTER_TYPE " + exporterType?.FullName);
+          if (exporterType != null)
+          {
+              foreach (var m in exporterType.GetMethods(BindingFlags.Public|BindingFlags.Instance|BindingFlags.Static|BindingFlags.DeclaredOnly))
+                  Console.WriteLine("EXPORTER_METHOD " + m);
           }
           '@ | Set-Content -LiteralPath (Join-Path $proj 'Program.cs')
           dotnet run -c Release *>&1 | Tee-Object -FilePath (Join-Path $env:PROBE_ROOT 'probe.log')
