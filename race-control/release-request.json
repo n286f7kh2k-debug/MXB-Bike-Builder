@@ -1,7 +1,7 @@
 {
-  "version": "0.5.6",
-  "filename": "MXB_Race_Day_Live_v0_5_6_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.6: corrective stability release built from the stable v0.5.4 extension/hot-update base. The v0.5.5 DWM/game-mirror path is completely removed so Garage cannot launch MX Bikes, cannot create a black mirror surface, and cannot consume resources in the background. The real two-way MX Bikes profile/content sync, native Bike/Head/Torso/Legs selection workflow, race loadout capture/apply, and stay-open hot updater remain. The taskbar path now extracts the exact desktop shortcut icon into a concrete multi-size assets/mxb_race_day_live.ico, applies that file directly through Tk + WM_SETICON/class icons, keeps one permanent AppUserModelID, migrates the shortcut to a dedicated MXB Race Day Live.exe launcher, and refreshes Explorer's icon cache.",
-  "builder_script": "race-control/build_v056_stability_icon.py",
+  "version": "0.5.7",
+  "filename": "MXB_Race_Day_Live_v0_5_7_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.7: fixes Garage content linking and replaces every Garage selector with real dropdowns. The scanner now indexes installed bike folders and PKZ bikes, resolves category metadata from unpacked INIs/readable PKZs, and recognizes protected OEM PKZs from their real MX1OEM/MX2OEM/MX3OEM content IDs so OEM 1, OEM 2 and OEM 3 families populate instead of leaving Category blank. Bike/Head/Torso/Legs dropdowns cascade from the real selected content and write immediately to the MX Bikes profile. Adds Rescan MX Bikes Content and Refresh From Game Profile controls. The working v0.5.6 taskbar icon path is preserved byte-for-byte; v0.5.6 stability, v0.5.4 extension/hot updater and v0.5.1 performance work are preserved. No MX Bikes process, DWM mirror or fake 3D model is started by Garage.",
+  "builder_script": "race-control/build_v057_garage_dropdown_link.py",
   "build_attempt": 1
 }
