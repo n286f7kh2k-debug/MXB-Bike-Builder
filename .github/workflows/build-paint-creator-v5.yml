@@ -44,7 +44,7 @@ jobs:
           if ($patchHash -ne '3147dc1188d40d0b722f8051fdd6237667bc6971d4c91bb93addcd6b1388a5db') { throw "V5 PATCH HASH MISMATCH: $patchHash" }
           Expand-Archive -Path $patchZip -DestinationPath $src -Force
 
-          # Explicit IO imports required by the WPF temporary compile project.
+          # Explicit imports required by WPF's generated temporary compile project.
           $ioFiles = @(
             'src\MXBRaceDayLive.PaintCreator\Services\RiderGearSetStore.cs',
             'src\MXBRaceDayLive.PaintCreator\Monetization\ProjectFingerprintService.cs',
@@ -58,6 +58,12 @@ jobs:
             if ($text -notmatch '(?m)^using System\.IO;') {
               Set-Content -LiteralPath $file -Value ("using System.IO;`r`n" + $text) -Encoding utf8
             }
+          }
+
+          $netFile = Join-Path $src 'src\MXBRaceDayLive.PaintCreator\Services\OfficialMxBikesPreviewModelService.cs'
+          $netText = Get-Content -Raw -LiteralPath $netFile
+          if ($netText -notmatch '(?m)^using System\.Net\.Http;') {
+            Set-Content -LiteralPath $netFile -Value ("using System.Net.Http;`r`n" + $netText) -Encoding utf8
           }
           "SRC=$src" >> $env:GITHUB_ENV
 
