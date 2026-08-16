@@ -23,7 +23,9 @@ The Windows build publishes a self-contained `MXB Race Day Live.exe` and a separ
 
 ## Garage / 3D preview
 
-The Garage reads installed MX Bikes bike IDs and loadout state without launching MX Bikes. Plain readable EDF geometry uses the native Race Day Live viewer. Creator-sealed EDF geometry is routed through an external authorized preview provider instead of being mis-parsed or replaced with a fake model. The first sealed-bike provider can attach to the user's installed MXB App/Frost renderer, drive its normal Studio controls to the clicked bike ID, and host the working renderer inside the Race Day Live Garage while MX Bikes remains closed. The bridge uses the Windows UI Automation support already provided by the WPF Windows desktop runtime, so no separate automation runtime is installed.
+The Garage reads installed MX Bikes bike IDs and loadout state without launching MX Bikes. Plain readable EDF geometry continues to use the native Race Day Live viewer. Creator-sealed OEM geometry now routes to an internal Race Day Live component based on the public iNsane/dmkrtz3DViewer workflow instead of requiring Frost or a second manually installed application. Race Day Live owns the component under its LocalAppData folder, starts it hidden, embeds its window inside the Garage, and uses the clicked MX Bikes bike ID to automatically target the closest matching bike entry. MX Bikes itself remains closed.
+
+The public iNsane viewer package is obtained from its publisher endpoint by Race Day Live on demand and cached inside the app's own component directory. Users are not asked to separately install Frost or iNsane's viewer. If the publisher endpoint blocks automated package retrieval, the Garage reports that component-download problem instead of falling back to the sealed EDF parser.
 
 ## Update architecture
 
