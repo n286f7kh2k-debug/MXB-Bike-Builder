@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build test and package v6
         shell: pwsh
-        run: ./ci-paint-v6-clean/build-v6.ps1
+        run: ./ci-paint-v6-clean/build-v6-fixed.ps1
       - name: Publish update feed
         shell: pwsh
         run: |
