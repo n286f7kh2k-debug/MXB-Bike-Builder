@@ -23,7 +23,8 @@ jobs:
           $source = (Resolve-Path 'race-control/launcher/MXBRaceDayLiveLauncher.cs').Path
           $out = Join-Path (Resolve-Path 'race-control/staging').Path 'MXB Race Day Live.exe'
           if (Test-Path $out) { Remove-Item $out -Force }
-          Add-Type -Path $source -OutputAssembly $out -OutputType WindowsApplication -CompilerOptions '/optimize'
+          $code = Get-Content $source -Raw
+          Add-Type -TypeDefinition $code -OutputAssembly $out -OutputType WindowsApplication -CompilerOptions '/optimize'
           if (-not (Test-Path $out)) { throw 'native branded launcher output missing' }
 
       - name: Validate branded launcher identity
