@@ -7,8 +7,13 @@ import sys
 import traceback
 from pathlib import Path
 
-# Import Tk here so PyInstaller includes Tcl/Tk in the branded host runtime.
+# Force core desktop UI dependencies into the PyInstaller host. The installed
+# source tree stays external so the in-app updater can keep updating it.
 import tkinter  # noqa: F401
+try:
+    from PIL import Image as _PIL_Image  # noqa: F401
+except Exception:
+    _PIL_Image = None
 
 
 def _add_runtime_packages(root: Path) -> None:
@@ -22,7 +27,6 @@ def _add_runtime_packages(root: Path) -> None:
                 runtime = Path(raw)
                 if not runtime.is_absolute():
                     runtime = (root / runtime).resolve()
-                # Typical runtime is .../.venv/Scripts/pythonw.exe.
                 candidates.append(runtime.parent.parent / 'Lib' / 'site-packages')
     except Exception:
         pass
@@ -55,7 +59,6 @@ def _show_fatal(message: str) -> None:
 
 
 def main() -> int:
-    # In a PyInstaller one-file build sys.executable is the installed branded EXE.
     root = Path(sys.executable).resolve().parent
     app = root / 'app.py'
     if not app.is_file():
@@ -69,9 +72,8 @@ def main() -> int:
             sys.path.insert(0, root_text)
         _add_runtime_packages(root)
 
-        # Keep the installed source tree external/updatable, but execute it inside
-        # this branded process. Windows therefore sees MXB Race Day Live.exe as
-        # the actual owner of the Tk application window instead of pythonw.exe.
+        # Execute app.py inside this process. There is no pythonw child process,
+        # so Windows sees MXB Race Day Live.exe as the actual app owner.
         sys.argv = [str(app), *sys.argv[1:]]
         runpy.run_path(str(app), run_name='__main__')
         return 0
