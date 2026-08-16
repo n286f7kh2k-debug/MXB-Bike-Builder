@@ -1,0 +1,37 @@
+name: Fix v1.0.15 Dashboard Compile
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/fix-v1015-dashboard-compile.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+      - name: Fix avatar brush typing
+        shell: python
+        run: |
+          from pathlib import Path
+          p = Path('native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs')
+          s = p.read_text(encoding='utf-8')
+          old = '''        var avatarFill = TryImageBrush(rider.AvatarPath) ?? new LinearGradientBrush(Color("#0D3551"), Color("#06131F"), 45);\n        avatar.Children.Add(new Ellipse { Fill = avatarFill, Stroke = Brush("#E8F7FF"), StrokeThickness = 3, Effect = Glow("#00A8FF", 18, 0.50) });\n        if (TryImageBrush(rider.AvatarPath) is null)'''
+          new = '''        var avatarImageBrush = TryImageBrush(rider.AvatarPath);\n        Brush avatarFill = (Brush?)avatarImageBrush ?? new LinearGradientBrush(Color("#0D3551"), Color("#06131F"), 45);\n        avatar.Children.Add(new Ellipse { Fill = avatarFill, Stroke = Brush("#E8F7FF"), StrokeThickness = 3, Effect = Glow("#00A8FF", 18, 0.50) });\n        if (avatarImageBrush is null)'''
+          if old not in s:
+              raise SystemExit('avatar brush target not found')
+          p.write_text(s.replace(old, new, 1), encoding='utf-8')
+      - name: Commit compile fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
+          git commit -m "Fix v1.0.15 avatar brush typing"
+          git push origin native-rebuild
