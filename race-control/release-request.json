@@ -1,7 +1,7 @@
 {
-  "version": "0.5.15",
-  "filename": "MXB_Race_Day_Live_v0_5_15_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.15 restores the branded Windows process identity without reintroducing the v0.5.13 startup regression. The branded EXE owns the running UI again, the missing Tkinter/Pillow frozen-host imports are explicitly bundled and smoke-tested in CI, existing desktop/taskbar links are repaired to the branded EXE with the permanent app icon, and future native-host restarts clear inherited PyInstaller state before launch. Garage/model/performance work remains paused until this Windows identity update is verified.",
-  "builder_script": "race-control/build_v0515_native_identity.py",
+  "version": "0.5.16",
+  "filename": "MXB_Race_Day_Live_v0_5_16_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.16 adds a dedicated Tracks section to the race-night top navigation. Track cards use the existing pinned MXB-Shop mappings so the displayed artwork matches the exact linked release, with no fuzzy or mirror matching. The initial library includes Spring Creek/Millville, Buchanan/RedBud, Pala/Fox Raceway, Anaheim 1 and San Diego. Clicking the image, card details or OPEN TRACK PAGE button opens the exact MXB-Shop release. The track-media cache is refreshed to clear stale thumbnails while the v0.5.15 branded Windows identity, hot updater and existing app features are preserved.",
+  "builder_script": "race-control/build_v0516_tracks.py",
   "build_attempt": 1
 }
