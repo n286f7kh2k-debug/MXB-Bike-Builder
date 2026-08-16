@@ -67,10 +67,14 @@ fn run() -> Result<(), String> {
         return Err("no renderable EDF geometry was decoded".into());
     }
 
+    // Frost assembles bike parts in the game's authored frame, then converts the complete
+    // result to the right-handed Y-up frame used by its viewer. Gear/rider parts use the
+    // same handedness conversion after parsing.
     if mode == "bike" && geom != "-" && Path::new(geom).is_file() {
         let bytes = fs::read(geom).map_err(|e| format!("read {geom}: {e}"))?;
         let _ = edf::assemble_bike(&mut nodes, &bytes);
     }
+    edf::to_right_handed(&mut nodes);
 
     let nodes = nodes
         .into_iter()
