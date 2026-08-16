@@ -1,0 +1,50 @@
+name: Inspect MX Bikes Rider Templates
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/race-day-live-paint-creator
+    paths:
+      - '.github/workflows/inspect-mxb-rider-templates.yml'
+
+jobs:
+  inspect:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official PiBoSo template archives
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $out = Join-Path $env:RUNNER_TEMP 'mxb-template-inspection'
+          New-Item -ItemType Directory -Force -Path $out | Out-Null
+          $archives = @(
+            @{ Name = 'rider-model-templates'; Url = 'https://www.mx-bikes.com/downloads/mxb_rider_templates.zip' },
+            @{ Name = 'bike-rider-paint-templates'; Url = 'https://www.mx-bikes.com/downloads/templates.zip' }
+          )
+          foreach ($a in $archives) {
+            $zip = Join-Path $out ($a.Name + '.zip')
+            try {
+              Invoke-WebRequest -Uri $a.Url -OutFile $zip -UseBasicParsing
+              $dir = Join-Path $out $a.Name
+              Expand-Archive -LiteralPath $zip -DestinationPath $dir -Force
+              Get-ChildItem -LiteralPath $dir -Recurse -File |
+                ForEach-Object { $_.FullName.Substring($dir.Length + 1) + "`t" + $_.Length } |
+                Set-Content (Join-Path $out ($a.Name + '-files.txt'))
+            } catch {
+              "FAILED: $($_.Exception.Message)" | Set-Content (Join-Path $out ($a.Name + '-files.txt'))
+            }
+          }
+          Get-ChildItem -LiteralPath $out -Recurse -File -Include *.fbx,*.obj,*.blend,*.dae,*.3ds,*.edf,*.tga,*.psd |
+            Select-Object FullName,Length |
+            Format-Table -AutoSize | Out-String | Set-Content (Join-Path $out '3d-and-paint-assets.txt')
+          "OUT=$out" >> $env:GITHUB_ENV
+      - name: Upload inspection listings
+        uses: actions/upload-artifact@v4
+        with:
+          name: mxb-official-template-file-listings
+          path: |
+            ${{ env.OUT }}/*-files.txt
+            ${{ env.OUT }}/3d-and-paint-assets.txt
+          retention-days: 3
