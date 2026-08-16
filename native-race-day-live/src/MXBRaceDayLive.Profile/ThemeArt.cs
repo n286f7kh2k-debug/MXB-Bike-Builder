@@ -22,7 +22,7 @@ internal static class ThemeArt
     {
         var brush = new ImageBrush(HeaderImage.Value)
         {
-            Stretch = Stretch.UniformToFill,
+            Stretch = Stretch.Uniform,
             AlignmentX = AlignmentX.Center,
             AlignmentY = AlignmentY.Center,
             ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,

@@ -1258,7 +1258,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             bitmap.Freeze();
             var brush = new ImageBrush(bitmap)
             {
-                Stretch = Stretch.UniformToFill,
+                Stretch = Stretch.Uniform,
                 AlignmentX = AlignmentX.Center,
                 AlignmentY = AlignmentY.Center
             };
