@@ -1,0 +1,1 @@
+Native MXB Race Day Live hot-update channel. Binary profile modules are published under updates/modules/<version>/ and latest.json points the app to the newest verified module.
