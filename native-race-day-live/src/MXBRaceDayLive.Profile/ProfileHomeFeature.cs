@@ -17,14 +17,16 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     private Grid? _pageHost;
     private ScrollViewer? _profileView;
     private FrameworkElement? _bikeLibraryView;
+    private FrameworkElement? _bikeModelView;
     private FileSystemWatcher? _profileWatcher;
     private FileSystemWatcher? _globalWatcher;
     private CancellationTokenSource? _watchRefreshCts;
+    private CancellationTokenSource? _modelLoadCts;
     private readonly object _watchGate = new();
     private bool _selectionHooked;
 
     public string Id => "profile-home";
-    public Version Version => new(1, 0, 3);
+    public Version Version => new(1, 0, 4);
 
     public FrameworkElement CreateView(IRaceDayContext context)
     {
@@ -40,7 +42,6 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             _context.MXBikes.SelectionChanged += MXBikes_SelectionChanged;
             _selectionHooked = true;
         }
-
         await RefreshMXBStateAsync(reconfigureWatchers: true, cancellationToken);
     }
 
@@ -49,6 +50,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         UnhookSelection();
         DisposeWatchers();
         CancelQueuedRefresh();
+        CancelModelLoad();
         return Task.CompletedTask;
     }
 
@@ -57,16 +59,17 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         UnhookSelection();
         DisposeWatchers();
         CancelQueuedRefresh();
+        CancelModelLoad();
         _context = null;
         _pageHost = null;
         _profileView = null;
         _bikeLibraryView = null;
+        _bikeModelView = null;
     }
 
     private FrameworkElement Build(RiderProfile rider)
     {
         _pageHost = new Grid { Background = Brush("#04101B") };
-
         _profileView = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
@@ -211,23 +214,16 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var root = new Grid();
         card.Child = root;
         root.Background = new LinearGradientBrush(Color("#0A2D44"), Color("#06131F"), 35);
-
-        var slash1 = new Polygon
+        root.Children.Add(new Polygon
         {
             Points = new PointCollection(new[] { new Point(205, -15), new Point(280, -15), new Point(150, 190), new Point(82, 190) }),
-            Fill = Brush("#0A7FC3"),
-            Opacity = 0.15,
-            IsHitTestVisible = false
-        };
-        var slash2 = new Polygon
+            Fill = Brush("#0A7FC3"), Opacity = 0.15, IsHitTestVisible = false
+        });
+        root.Children.Add(new Polygon
         {
             Points = new PointCollection(new[] { new Point(255, -15), new Point(295, -15), new Point(165, 190), new Point(128, 190) }),
-            Fill = Brush("#17B7FF"),
-            Opacity = 0.13,
-            IsHitTestVisible = false
-        };
-        root.Children.Add(slash1);
-        root.Children.Add(slash2);
+            Fill = Brush("#17B7FF"), Opacity = 0.13, IsHitTestVisible = false
+        });
 
         var content = new Grid { Margin = new Thickness(17, 14, 17, 15) };
         content.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -242,7 +238,6 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         _garageSyncText = Label("CONNECTING…", 9, "#079CFF", true);
         Grid.SetColumn(_garageSyncText, 1);
         header.Children.Add(_garageSyncText);
-        Grid.SetRow(header, 0);
         content.Children.Add(header);
 
         var bikeStack = new StackPanel { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 11, 0, 8) };
@@ -265,7 +260,6 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         footer.Child = Label("OPEN MX BIKES BIKE LIBRARY  ›", 8.5, "#079CFF", true);
         Grid.SetRow(footer, 2);
         content.Children.Add(footer);
-
         return card;
     }
 
@@ -276,7 +270,14 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var profileView = _profileView;
         if (context is null || host is null || profileView is null) return;
 
+        CancelModelLoad();
         profileView.Visibility = Visibility.Collapsed;
+        if (_bikeModelView is not null)
+        {
+            host.Children.Remove(_bikeModelView);
+            _bikeModelView = null;
+        }
+        if (_bikeLibraryView is not null) host.Children.Remove(_bikeLibraryView);
 
         var loading = BuildBikeLibraryShell();
         _bikeLibraryView = loading;
@@ -308,7 +309,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
                     Children =
                     {
                         Label("NO BIKES FOUND", 17, "#F2F7FB", true),
-                        Label("Race Day Live did not find readable bike entries in the MX Bikes install/mod bike folders.", 12, "#88A5BA", false, new Thickness(0, 6, 0, 0))
+                        Label("Race Day Live did not find bike entries in the MX Bikes install/mod bike folders.", 12, "#88A5BA", false, new Thickness(0, 6, 0, 0))
                     }
                 };
                 body.Children.Add(empty);
@@ -316,24 +317,13 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             }
 
             var wrap = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
-            foreach (var bike in bikes)
-                wrap.Children.Add(BuildBikeTile(bike, current));
+            foreach (var bike in bikes) wrap.Children.Add(BuildBikeTile(bike, current));
             body.Children.Add(wrap);
         }
         catch (Exception ex)
         {
             body.Children.Clear();
-            var error = Card(new Thickness(0, 20, 0, 0));
-            error.Child = new StackPanel
-            {
-                Margin = new Thickness(22),
-                Children =
-                {
-                    Label("BIKE LIBRARY COULD NOT LOAD", 17, "#FF5964", true),
-                    Label(ex.Message, 12, "#88A5BA", false, new Thickness(0, 6, 0, 0))
-                }
-            };
-            body.Children.Add(error);
+            body.Children.Add(ErrorCard("BIKE LIBRARY COULD NOT LOAD", ex.Message));
         }
     }
 
@@ -342,40 +332,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var page = new Grid { Background = Brush("#04101B") };
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
-
-        var top = new Border
-        {
-            Background = Brush("#061725"),
-            BorderBrush = Brush("#155273"),
-            BorderThickness = new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(30, 22, 30, 20)
-        };
-        var topGrid = new Grid();
-        topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-        topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-        top.Child = topGrid;
-
-        var back = new Button
-        {
-            Content = "‹  BACK TO PROFILE",
-            Background = Brush("#0A2235"),
-            Foreground = Brush("#F2F7FB"),
-            BorderBrush = Brush("#155273"),
-            BorderThickness = new Thickness(1),
-            Padding = new Thickness(16, 9, 16, 9),
-            Cursor = Cursors.Hand,
-            FontFamily = new FontFamily("Segoe UI Semibold")
-        };
-        back.Click += (_, _) => CloseBikeLibrary();
-        topGrid.Children.Add(back);
-
-        var title = new StackPanel { Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-        title.Children.Add(Label("MX BIKES GARAGE", 24, "#F2F7FB", true));
-        title.Children.Add(Label("Installed bikes loaded directly into Race Day Live — MX Bikes stays closed.", 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
-        Grid.SetColumn(title, 1);
-        topGrid.Children.Add(title);
-        Grid.SetRow(top, 0);
-        page.Children.Add(top);
+        page.Children.Add(BuildPageHeader("‹  BACK TO PROFILE", CloseBikeLibrary, "MX BIKES GARAGE", "Installed bikes loaded directly into Race Day Live — MX Bikes stays closed."));
 
         var scroll = new ScrollViewer
         {
@@ -419,18 +376,20 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var card = new Border
         {
             Width = 260,
-            MinHeight = 132,
+            MinHeight = 148,
             Margin = new Thickness(0, 0, 14, 14),
             Padding = new Thickness(17),
             Background = selected ? Brush("#0B3149") : Brush("#071A29"),
             BorderBrush = selected ? Brush("#079CFF") : Brush("#155273"),
             BorderThickness = new Thickness(selected ? 2 : 1),
-            CornerRadius = new CornerRadius(14)
+            CornerRadius = new CornerRadius(14),
+            Cursor = Cursors.Hand,
+            ToolTip = "View this bike's actual installed MX Bikes 3D model"
         };
+        card.MouseLeftButtonUp += async (_, _) => await OpenBikeModelAsync(bike);
 
         var stack = new StackPanel();
         card.Child = stack;
-
         var header = new Grid();
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -443,16 +402,153 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var bikeName = Label(Friendly(bike.DisplayName), 16, "#F2F7FB", true, new Thickness(0, 12, 0, 5));
         bikeName.TextWrapping = TextWrapping.Wrap;
         stack.Children.Add(bikeName);
-        stack.Children.Add(Label(bike.IsReadableByRaceDayLive ? "Installed · available to Race Day Live" : "Installed · protected package", 10, bike.IsReadableByRaceDayLive ? "#88A5BA" : "#F4C542"));
-
+        stack.Children.Add(Label(bike.IsReadableByRaceDayLive ? "Installed · exact source linked" : "Installed · protected package", 10, bike.IsReadableByRaceDayLive ? "#88A5BA" : "#F4C542"));
+        stack.Children.Add(Label("VIEW 3D MODEL  ›", 9, "#079CFF", true, new Thickness(0, 13, 0, 0)));
         return card;
+    }
+
+    private async Task OpenBikeModelAsync(MXContentItem bike)
+    {
+        var host = _pageHost;
+        if (host is null) return;
+
+        CancelModelLoad();
+        _modelLoadCts = new CancellationTokenSource();
+        var token = _modelLoadCts.Token;
+
+        if (_bikeLibraryView is not null) host.Children.Remove(_bikeLibraryView);
+        if (_bikeModelView is not null) host.Children.Remove(_bikeModelView);
+
+        var page = new Grid { Background = Brush("#04101B") };
+        page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        page.Children.Add(BuildPageHeader("‹  BACK TO GARAGE", CloseBikeModel, Friendly(bike.DisplayName), "Exact installed MX Bikes source · in-app 3D viewer"));
+
+        var scroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        var body = new StackPanel { Margin = new Thickness(32, 24, 32, 34) };
+        body.Children.Add(Label("RESOLVING INSTALLED BIKE → EDF MODEL…", 14, "#079CFF", true));
+        body.Children.Add(Label(bike.Path, 10, "#88A5BA", false, new Thickness(0, 7, 0, 0)));
+        scroll.Content = body;
+        Grid.SetRow(scroll, 1);
+        page.Children.Add(scroll);
+
+        _bikeModelView = page;
+        host.Children.Add(page);
+
+        try
+        {
+            var result = await BikeModelViewer.CreateAsync(bike, token);
+            token.ThrowIfCancellationRequested();
+            body.Children.Clear();
+            body.Children.Add(ModelLinkCard(result.SourcePath, result.ModelDescription));
+            body.Children.Add(result.View);
+            body.Children.Add(Label("DRAG TO ROTATE  •  MOUSE WHEEL TO ZOOM", 9, "#5E8299", true, new Thickness(2, 10, 0, 0)));
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (token.IsCancellationRequested) return;
+            body.Children.Clear();
+            body.Children.Add(ModelLinkCard(bike.Path, "Model unavailable"));
+            body.Children.Add(ErrorCard("EXACT 3D MODEL COULD NOT LOAD", ex.Message));
+        }
+    }
+
+    private FrameworkElement ModelLinkCard(string sourcePath, string modelDescription)
+    {
+        var card = Card(new Thickness(0, 0, 0, 16));
+        var stack = new StackPanel { Margin = new Thickness(20, 16, 20, 16) };
+        stack.Children.Add(Label("MX BIKES SOURCE", 9, "#079CFF", true));
+        var source = Label(sourcePath, 11, "#C5D5E0", false, new Thickness(0, 5, 0, 10));
+        source.TextWrapping = TextWrapping.Wrap;
+        stack.Children.Add(source);
+        stack.Children.Add(Label("RESOLVED 3D MODEL", 9, "#079CFF", true));
+        var model = Label(modelDescription, 11, "#F2F7FB", true, new Thickness(0, 5, 0, 0));
+        model.TextWrapping = TextWrapping.Wrap;
+        stack.Children.Add(model);
+        card.Child = stack;
+        return card;
+    }
+
+    private FrameworkElement BuildPageHeader(string backText, Action backAction, string titleText, string subtitleText)
+    {
+        var top = new Border
+        {
+            Background = Brush("#061725"),
+            BorderBrush = Brush("#155273"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(30, 22, 30, 20)
+        };
+        var grid = new Grid();
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        top.Child = grid;
+
+        var back = new Button
+        {
+            Content = backText,
+            Background = Brush("#0A2235"),
+            Foreground = Brush("#F2F7FB"),
+            BorderBrush = Brush("#155273"),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(16, 9, 16, 9),
+            Cursor = Cursors.Hand,
+            FontFamily = new FontFamily("Segoe UI Semibold")
+        };
+        back.Click += (_, _) => backAction();
+        grid.Children.Add(back);
+
+        var title = new StackPanel { Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        title.Children.Add(Label(titleText, 24, "#F2F7FB", true));
+        title.Children.Add(Label(subtitleText, 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
+        Grid.SetColumn(title, 1);
+        grid.Children.Add(title);
+        return top;
+    }
+
+    private FrameworkElement ErrorCard(string title, string message)
+    {
+        var error = Card(new Thickness(0, 16, 0, 0));
+        var stack = new StackPanel { Margin = new Thickness(22) };
+        stack.Children.Add(Label(title, 17, "#FF5964", true));
+        var body = Label(message, 12, "#88A5BA", false, new Thickness(0, 6, 0, 0));
+        body.TextWrapping = TextWrapping.Wrap;
+        stack.Children.Add(body);
+        error.Child = stack;
+        return error;
+    }
+
+    private void CloseBikeModel()
+    {
+        CancelModelLoad();
+        var host = _pageHost;
+        if (host is null) return;
+        if (_bikeModelView is not null)
+        {
+            host.Children.Remove(_bikeModelView);
+            _bikeModelView = null;
+        }
+        if (_bikeLibraryView is not null && !host.Children.Contains(_bikeLibraryView))
+            host.Children.Add(_bikeLibraryView);
     }
 
     private void CloseBikeLibrary()
     {
+        CancelModelLoad();
         var host = _pageHost;
         var profile = _profileView;
         if (host is null || profile is null) return;
+        if (_bikeModelView is not null)
+        {
+            host.Children.Remove(_bikeModelView);
+            _bikeModelView = null;
+        }
         if (_bikeLibraryView is not null)
         {
             host.Children.Remove(_bikeLibraryView);
@@ -461,22 +557,26 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         profile.Visibility = Visibility.Visible;
     }
 
+    private void CancelModelLoad()
+    {
+        _modelLoadCts?.Cancel();
+        _modelLoadCts?.Dispose();
+        _modelLoadCts = null;
+    }
+
     private async Task RefreshMXBStateAsync(bool reconfigureWatchers, CancellationToken cancellationToken)
     {
         var context = _context;
         if (context is null) return;
-
         try
         {
             var env = await context.MXBikes.DetectEnvironmentAsync(cancellationToken);
             if (reconfigureWatchers) ConfigureWatchers(env);
-
             if (string.IsNullOrWhiteSpace(env.ProfileIniPath) || !File.Exists(env.ProfileIniPath))
             {
                 SetGarageState("NO ACTIVE PROFILE", "MX Bikes profile.ini was not found", "NOT LINKED", "#FF5964");
                 return;
             }
-
             var selection = await context.MXBikes.ReadActiveSelectionAsync(cancellationToken);
             ApplySelection(selection);
         }
@@ -510,7 +610,6 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
                 _garageSyncText.Foreground = Brush(statusColor);
             }
         }
-
         var dispatcher = Application.Current?.Dispatcher;
         if (dispatcher is null || dispatcher.CheckAccess()) Apply();
         else dispatcher.BeginInvoke(Apply);
@@ -519,7 +618,6 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     private void ConfigureWatchers(MXBikesEnvironment env)
     {
         DisposeWatchers();
-
         if (!string.IsNullOrWhiteSpace(env.ProfileIniPath))
         {
             var profileDir = Path.GetDirectoryName(env.ProfileIniPath);
@@ -531,12 +629,11 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
                     EnableRaisingEvents = true
                 };
-                _profileWatcher.Changed += (_, _) => QueueRefresh(reconfigureWatchers: false);
-                _profileWatcher.Created += (_, _) => QueueRefresh(reconfigureWatchers: false);
-                _profileWatcher.Renamed += (_, _) => QueueRefresh(reconfigureWatchers: false);
+                _profileWatcher.Changed += (_, _) => QueueRefresh(false);
+                _profileWatcher.Created += (_, _) => QueueRefresh(false);
+                _profileWatcher.Renamed += (_, _) => QueueRefresh(false);
             }
         }
-
         if (!string.IsNullOrWhiteSpace(env.UserDataDirectory))
         {
             var globalIni = Path.Combine(env.UserDataDirectory, "global.ini");
@@ -548,9 +645,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.Size | NotifyFilters.FileName,
                     EnableRaisingEvents = true
                 };
-                _globalWatcher.Changed += (_, _) => QueueRefresh(reconfigureWatchers: true);
-                _globalWatcher.Created += (_, _) => QueueRefresh(reconfigureWatchers: true);
-                _globalWatcher.Renamed += (_, _) => QueueRefresh(reconfigureWatchers: true);
+                _globalWatcher.Changed += (_, _) => QueueRefresh(true);
+                _globalWatcher.Created += (_, _) => QueueRefresh(true);
+                _globalWatcher.Renamed += (_, _) => QueueRefresh(true);
             }
         }
     }
@@ -565,7 +662,6 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             _watchRefreshCts = new CancellationTokenSource();
             cts = _watchRefreshCts;
         }
-
         _ = Task.Run(async () =>
         {
             try
@@ -591,10 +687,8 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
     private void DisposeWatchers()
     {
-        _profileWatcher?.Dispose();
-        _profileWatcher = null;
-        _globalWatcher?.Dispose();
-        _globalWatcher = null;
+        _profileWatcher?.Dispose(); _profileWatcher = null;
+        _globalWatcher?.Dispose(); _globalWatcher = null;
     }
 
     private void UnhookSelection()
@@ -631,8 +725,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     {
         var stack = new StackPanel { Margin = new Thickness(2, 0, 0, 10) };
         stack.Children.Add(Label(title, 18, "#F2F7FB", true));
-        if (!string.IsNullOrWhiteSpace(subtitle))
-            stack.Children.Add(Label(subtitle, 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
+        if (!string.IsNullOrWhiteSpace(subtitle)) stack.Children.Add(Label(subtitle, 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
         return stack;
     }
 
