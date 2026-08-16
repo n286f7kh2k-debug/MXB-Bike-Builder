@@ -204,12 +204,20 @@ internal static class InsaneBikePreviewProvider
             string bikeId,
             CancellationToken cancellationToken)
         {
-            var process = Process.Start(new ProcessStartInfo(executable)
+            var runtimeRoot = await InsaneDotNetRuntime.EnsureAsync(cancellationToken);
+            var startInfo = new ProcessStartInfo(executable)
             {
-                UseShellExecute = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
                 WorkingDirectory = Path.GetDirectoryName(executable) ?? string.Empty,
                 WindowStyle = ProcessWindowStyle.Hidden
-            }) ?? throw new InvalidOperationException("Race Day Live could not start its internal iNsane preview component.");
+            };
+            startInfo.Environment["DOTNET_ROOT"] = runtimeRoot;
+            startInfo.Environment["DOTNET_ROOT_X64"] = runtimeRoot;
+            startInfo.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";
+
+            var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Race Day Live could not start its internal iNsane preview component.");
 
             var hwnd = await WaitForWindowAsync(process, cancellationToken);
             if (hwnd == IntPtr.Zero)
