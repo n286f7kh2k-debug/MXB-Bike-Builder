@@ -1,7 +1,8 @@
 {
   "version": "0.3.8",
   "filename": "MXB_Race_Day_Live_v0_3_8_UPDATE.zip",
-  "notes": "Format inspection only; no release publication intended.",
+  "notes": "3D viewer toolchain inspection only; no release publication intended.",
   "builder_script": "race-control/inspect_edf_binary.py",
-  "inspection": "edf_binary"
+  "inspection": "viewer_toolchain",
+  "attempt": 2
 }
