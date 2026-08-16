@@ -1,7 +1,7 @@
 {
   "version": "0.3.8",
   "filename": "MXB_Race_Day_Live_v0_3_8_UPDATE.zip",
-  "notes": "Runtime inspection only; no release publication intended.",
-  "builder_script": "race-control/inspect_v038_runtime.py",
-  "inspection": "v038_runtime"
+  "notes": "Windows integration inspection only; no release publication intended.",
+  "builder_script": "race-control/inspect_windows_integration.py",
+  "inspection": "windows_integration"
 }
