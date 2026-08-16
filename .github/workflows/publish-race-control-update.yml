@@ -9,11 +9,52 @@ permissions:
   contents: write
 
 jobs:
+  build-mxb-decoder:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Fetch pinned Frost EDF parser
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dest = 'race-control/frost-decoder/src/edf.rs'
+          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+          $url = 'https://raw.githubusercontent.com/Frostn1/mxb-app/2d3775a8d2931d2dd295f6211e0073293a805353/src-tauri/src/edf.rs'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest
+          $hash = (Get-FileHash $dest -Algorithm SHA256).Hash.ToLowerInvariant()
+          Write-Host "Frost EDF source SHA256: $hash"
+          if ((Get-Content $dest -Raw) -notmatch 'EDF\\0') { throw 'Pinned Frost EDF parser did not contain the EDF signature' }
+
+      - name: Build native MXB asset decoder
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build --manifest-path race-control/frost-decoder/Cargo.toml --release
+          New-Item -ItemType Directory -Force -Path race-control/staging | Out-Null
+          Copy-Item race-control/frost-decoder/target/release/mxb_asset_decoder.exe race-control/staging/mxb_asset_decoder.exe -Force
+          if (-not (Test-Path race-control/staging/mxb_asset_decoder.exe)) { throw 'decoder executable missing' }
+
+      - name: Upload MXB decoder
+        uses: actions/upload-artifact@v4
+        with:
+          name: mxb-asset-decoder
+          path: race-control/staging/mxb_asset_decoder.exe
+          if-no-files-found: error
+
   publish:
+    needs: build-mxb-decoder
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Download MXB decoder
+        uses: actions/download-artifact@v4
+        with:
+          name: mxb-asset-decoder
+          path: race-control/staging
 
       - name: Assemble Race Control release
         shell: bash
