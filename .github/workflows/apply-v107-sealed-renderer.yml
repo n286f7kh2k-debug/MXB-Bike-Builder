@@ -1,0 +1,69 @@
+name: Apply v1.0.7 sealed bike renderer
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/apply-v107-sealed-renderer.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+          fetch-depth: 0
+
+      - name: Wire Frost renderer fallback
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $viewerPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/BikeModelViewer.cs'
+          $viewer = Get-Content $viewerPath -Raw
+          $old = @'
+        var bundle = await Task.Run(() => ResolveBundle(bike), cancellationToken);
+        var decoder = await EnsureDecoderAsync(cancellationToken);
+'@
+          $new = @'
+        var bundle = await Task.Run(() => ResolveBundle(bike), cancellationToken);
+        if (FrostBikePreviewProvider.RequiresFrost(bundle.EdfFiles))
+            return await FrostBikePreviewProvider.CreateAsync(bike, bundle.SourcePath, cancellationToken);
+
+        var decoder = await EnsureDecoderAsync(cancellationToken);
+'@
+          if (-not $viewer.Contains($old)) { throw 'BikeModelViewer CreateAsync insertion point was not found' }
+          $viewer = $viewer.Replace($old, $new)
+          [System.IO.File]::WriteAllText((Resolve-Path $viewerPath), $viewer)
+
+      - name: Bump profile module and add UI Automation references
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $projectPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj'
+          $project = Get-Content $projectPath -Raw
+          $project = $project.Replace('<Version>1.0.6</Version>', '<Version>1.0.7</Version>')
+          if ($project -notmatch 'UIAutomationClient') {
+            $refs = @'
+  <ItemGroup>
+    <Reference Include="UIAutomationClient" />
+    <Reference Include="UIAutomationTypes" />
+  </ItemGroup>
+'@
+            $project = $project.Replace('</Project>', "$refs</Project>")
+          }
+          if ($project -notmatch '<Version>1\.0\.7</Version>') { throw 'Profile version did not bump to 1.0.7' }
+          [System.IO.File]::WriteAllText((Resolve-Path $projectPath), $project)
+
+      - name: Commit v1.0.7 source changes
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- native-race-day-live/src/MXBRaceDayLive.Profile/BikeModelViewer.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          if (git diff --cached --quiet) { throw 'No v1.0.7 source changes were produced' }
+          git commit -m 'Route sealed bike previews through installed Frost renderer v1.0.7'
+          git push origin HEAD:native-rebuild
