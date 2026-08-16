@@ -3,6 +3,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using MXBRaceDayLive.Contracts;
 
@@ -71,15 +72,15 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
     private FrameworkElement Build(RiderProfile rider)
     {
-        _pageHost = new Grid { Background = Brush("#04101B") };
+        _pageHost = new Grid { Background = PageBackground() };
         _profileView = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
-            Background = Brush("#04101B")
+            Background = Brushes.Transparent
         };
 
-        var stack = new StackPanel { Margin = new Thickness(34, 26, 34, 34) };
+        var stack = new StackPanel { Margin = new Thickness(26, 22, 26, 32) };
         _profileView.Content = stack;
         _pageHost.Children.Add(_profileView);
 
@@ -89,32 +90,95 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
         var banner = new Border
         {
-            Height = 210,
-            CornerRadius = new CornerRadius(18, 18, 0, 0),
-            Background = new LinearGradientBrush(Color("#0A4F78"), Color("#061725"), 0),
+            Height = 220,
+            CornerRadius = new CornerRadius(15, 15, 0, 0),
+            Background = HeroBackground(),
+            BorderBrush = Brush("#0A7FC3"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
             ClipToBounds = true
         };
         var bannerGrid = new Grid();
         banner.Child = bannerGrid;
-        bannerGrid.Children.Add(new TextBlock
+
+        bannerGrid.Children.Add(new Ellipse
         {
-            Text = "MXB RACE DAY LIVE",
-            Foreground = Brush("#2E84B2"),
+            Width = 520,
+            Height = 520,
+            Fill = new RadialGradientBrush(Color("#1B9DFF"), Color("#00121F")) { RadiusX = 0.72, RadiusY = 0.72 },
+            Opacity = 0.18,
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Center,
+            Margin = new Thickness(0, 0, -180, 0),
+            IsHitTestVisible = false
+        });
+        bannerGrid.Children.Add(new Polygon
+        {
+            Points = new PointCollection(new[] { new Point(620, -40), new Point(790, -40), new Point(560, 260), new Point(410, 260) }),
+            Fill = Brush("#009BFF"),
+            Opacity = 0.13,
+            IsHitTestVisible = false
+        });
+        bannerGrid.Children.Add(new Polygon
+        {
+            Points = new PointCollection(new[] { new Point(760, -40), new Point(835, -40), new Point(605, 260), new Point(540, 260) }),
+            Fill = Brush("#24C8FF"),
+            Opacity = 0.10,
+            IsHitTestVisible = false
+        });
+
+        var brand = new StackPanel { Margin = new Thickness(28, 24, 0, 0), VerticalAlignment = VerticalAlignment.Top };
+        brand.Children.Add(new TextBlock
+        {
+            Text = "MXB",
+            Foreground = Brush("#F7FBFF"),
             FontFamily = new FontFamily("Segoe UI Black"),
             FontStyle = FontStyles.Italic,
-            FontSize = 30,
-            Margin = new Thickness(26),
-            VerticalAlignment = VerticalAlignment.Top
+            FontSize = 44,
+            CharacterSpacing = -25
+        });
+        var liveRow = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(2, -8, 0, 0) };
+        liveRow.Children.Add(new TextBlock
+        {
+            Text = "RACE DAY ",
+            Foreground = Brush("#DCEAF4"),
+            FontFamily = new FontFamily("Segoe UI Black"),
+            FontStyle = FontStyles.Italic,
+            FontSize = 20
+        });
+        liveRow.Children.Add(new TextBlock
+        {
+            Text = "LIVE",
+            Foreground = Brush("#0AAEFF"),
+            FontFamily = new FontFamily("Segoe UI Black"),
+            FontStyle = FontStyles.Italic,
+            FontSize = 25,
+            Effect = Glow("#008DFF", 16, 0.55)
+        });
+        brand.Children.Add(liveRow);
+        bannerGrid.Children.Add(brand);
+
+        bannerGrid.Children.Add(new TextBlock
+        {
+            Text = $"#{rider.RacingNumber}",
+            Foreground = Brush("#0AAEFF"),
+            FontFamily = new FontFamily("Segoe UI Black"),
+            FontStyle = FontStyles.Italic,
+            FontSize = 76,
+            Opacity = 0.16,
+            Margin = new Thickness(0, 0, 30, 10),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            IsHitTestVisible = false
         });
         profileStack.Children.Add(banner);
 
-        var identity = new Grid { Margin = new Thickness(24, 18, 24, 22) };
+        var identity = new Grid { Margin = new Thickness(24, 16, 24, 20) };
         identity.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(118) });
         identity.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         identity.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
 
         var avatar = new Grid { Width = 96, Height = 96, Margin = new Thickness(0, 0, 20, 0) };
-        avatar.Children.Add(new Ellipse { Fill = Brush("#0B2C42"), Stroke = Brush("#079CFF"), StrokeThickness = 2 });
+        avatar.Children.Add(new Ellipse { Fill = new LinearGradientBrush(Color("#0D3551"), Color("#06131F"), 45), Stroke = Brush("#0AAEFF"), StrokeThickness = 2, Effect = Glow("#008DFF", 14, 0.34) });
         avatar.Children.Add(new TextBlock
         {
             Text = Initials(rider.DisplayName),
@@ -134,14 +198,16 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             Text = rider.DisplayName,
             Foreground = Brushes.White,
             FontFamily = new FontFamily("Segoe UI Black"),
-            FontSize = 30
+            FontStyle = FontStyles.Italic,
+            FontSize = 32
         });
         nameRow.Children.Add(new TextBlock
         {
             Text = $"   #{rider.RacingNumber}",
-            Foreground = Brush("#F4C542"),
+            Foreground = Brush("#0AAEFF"),
             FontFamily = new FontFamily("Segoe UI Black"),
-            FontSize = 16,
+            FontStyle = FontStyles.Italic,
+            FontSize = 19,
             VerticalAlignment = VerticalAlignment.Center
         });
         info.Children.Add(nameRow);
@@ -236,7 +302,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         if (_bikeModelView is not null) { host.Children.Remove(_bikeModelView); _bikeModelView = null; }
         if (_settingsView is not null) host.Children.Remove(_settingsView);
 
-        var page = new Grid { Background = Brush("#04101B") };
+        var page = new Grid { Background = PageBackground() };
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         page.Children.Add(BuildPageHeader("‹  BACK TO PROFILE", CloseSettings, "SETTINGS", "Race Day Live configuration and MX Bikes file links."));
@@ -278,9 +344,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             var box = new TextBox
             {
                 Text = value ?? string.Empty,
-                Background = Brush("#04101B"),
-                Foreground = Brush("#F2F7FB"),
-                BorderBrush = Brush("#155273"),
+                Background = Brush("#030E18"),
+                Foreground = Brush("#F7FBFF"),
+                BorderBrush = Brush("#0A5D8E"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(10, 7, 10, 7),
                 FontSize = 11,
@@ -304,9 +370,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             var browse = new Button
             {
                 Content = "BROWSE",
-                Background = Brush("#0A2235"),
-                Foreground = Brush("#F2F7FB"),
-                BorderBrush = Brush("#155273"),
+                Background = ButtonBackground(),
+                Foreground = Brush("#F7FBFF"),
+                BorderBrush = Brush("#0A78B7"),
                 BorderThickness = new Thickness(1),
                 Padding = new Thickness(13, 8, 13, 8),
                 Cursor = Cursors.Hand,
@@ -364,9 +430,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         Button ActionButton(string text, string color = "#0A2235") => new()
         {
             Content = text,
-            Background = Brush(color),
-            Foreground = Brush("#F2F7FB"),
-            BorderBrush = Brush("#155273"),
+            Background = color == "#0A4F78" ? AccentButtonBackground() : ButtonBackground(),
+            Foreground = Brush("#F7FBFF"),
+            BorderBrush = Brush("#0A78B7"),
             BorderThickness = new Thickness(1),
             Padding = new Thickness(16, 9, 16, 9),
             Margin = new Thickness(0, 0, 9, 9),
@@ -460,16 +526,16 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
         var root = new Grid();
         card.Child = root;
-        root.Background = new LinearGradientBrush(Color("#0A2D44"), Color("#06131F"), 35);
+        root.Background = new LinearGradientBrush(Color("#0C3A57"), Color("#030D17"), 35);
         root.Children.Add(new Polygon
         {
             Points = new PointCollection(new[] { new Point(205, -15), new Point(280, -15), new Point(150, 190), new Point(82, 190) }),
-            Fill = Brush("#0A7FC3"), Opacity = 0.15, IsHitTestVisible = false
+            Fill = Brush("#0AAEFF"), Opacity = 0.20, IsHitTestVisible = false
         });
         root.Children.Add(new Polygon
         {
             Points = new PointCollection(new[] { new Point(255, -15), new Point(295, -15), new Point(165, 190), new Point(128, 190) }),
-            Fill = Brush("#17B7FF"), Opacity = 0.13, IsHitTestVisible = false
+            Fill = Brush("#24C8FF"), Opacity = 0.16, IsHitTestVisible = false
         });
 
         var content = new Grid { Margin = new Thickness(17, 14, 17, 15) };
@@ -581,7 +647,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
     private FrameworkElement BuildBikeLibraryShell()
     {
-        var page = new Grid { Background = Brush("#04101B") };
+        var page = new Grid { Background = PageBackground() };
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         page.Children.Add(BuildPageHeader("‹  BACK TO PROFILE", CloseBikeLibrary, "MX BIKES GARAGE", "Installed bikes loaded directly into Race Day Live — MX Bikes stays closed."));
@@ -631,10 +697,11 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             MinHeight = 148,
             Margin = new Thickness(0, 0, 14, 14),
             Padding = new Thickness(17),
-            Background = selected ? Brush("#0B3149") : Brush("#071A29"),
-            BorderBrush = selected ? Brush("#079CFF") : Brush("#155273"),
+            Background = selected ? new LinearGradientBrush(Color("#0C3F61"), Color("#061522"), 40) : PanelBackground(),
+            BorderBrush = selected ? Brush("#14B8FF") : Brush("#0A5A89"),
             BorderThickness = new Thickness(selected ? 2 : 1),
-            CornerRadius = new CornerRadius(14),
+            CornerRadius = new CornerRadius(13),
+            Effect = selected ? Glow("#008DFF", 18, 0.34) : Glow("#003D66", 12, 0.16),
             Cursor = Cursors.Hand,
             ToolTip = "View this bike's actual installed MX Bikes 3D model"
         };
@@ -671,7 +738,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         if (_bikeLibraryView is not null) host.Children.Remove(_bikeLibraryView);
         if (_bikeModelView is not null) host.Children.Remove(_bikeModelView);
 
-        var page = new Grid { Background = Brush("#04101B") };
+        var page = new Grid { Background = PageBackground() };
         page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
         page.Children.Add(BuildPageHeader("‹  BACK TO GARAGE", CloseBikeModel, Friendly(bike.DisplayName), "Exact installed MX Bikes source · in-app 3D viewer"));
@@ -732,10 +799,11 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     {
         var top = new Border
         {
-            Background = Brush("#061725"),
-            BorderBrush = Brush("#155273"),
+            Background = new LinearGradientBrush(Color("#071E30"), Color("#030D17"), 0),
+            BorderBrush = Brush("#0A75AE"),
             BorderThickness = new Thickness(0, 0, 0, 1),
-            Padding = new Thickness(30, 22, 30, 20)
+            Padding = new Thickness(28, 19, 28, 18),
+            Effect = Glow("#004E78", 12, 0.16)
         };
         var grid = new Grid();
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
@@ -745,9 +813,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var back = new Button
         {
             Content = backText,
-            Background = Brush("#0A2235"),
-            Foreground = Brush("#F2F7FB"),
-            BorderBrush = Brush("#155273"),
+            Background = ButtonBackground(),
+            Foreground = Brush("#F7FBFF"),
+            BorderBrush = Brush("#0A78B7"),
             BorderThickness = new Thickness(1),
             Padding = new Thickness(16, 9, 16, 9),
             Cursor = Cursors.Hand,
@@ -954,18 +1022,22 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
     private static Border Card(Thickness margin) => new()
     {
-        Background = Brush("#071A29"),
-        BorderBrush = Brush("#155273"),
+        Background = PanelBackground(),
+        BorderBrush = Brush("#0A5A89"),
         BorderThickness = new Thickness(1),
-        CornerRadius = new CornerRadius(18),
-        Margin = margin
+        CornerRadius = new CornerRadius(14),
+        Margin = margin,
+        Effect = Glow("#003D66", 14, 0.16)
     };
 
     private static FrameworkElement SnapshotCard(string kicker, string title, string subtitle, int column)
     {
         var card = Card(column == 0 ? new Thickness(0, 0, 9, 0) : new Thickness(9, 0, 0, 0));
         var stack = new StackPanel { Margin = new Thickness(22) };
-        stack.Children.Add(Label(kicker, 10, "#079CFF", true));
+        var kickerText = Label(kicker, 9.5, "#0AAEFF", true);
+        kickerText.FontFamily = new FontFamily("Segoe UI Black");
+        kickerText.FontStyle = FontStyles.Italic;
+        stack.Children.Add(kickerText);
         stack.Children.Add(Label(title, 17, "#F2F7FB", true, new Thickness(0, 7, 0, 6)));
         stack.Children.Add(Label(subtitle, 12, "#88A5BA"));
         card.Child = stack;
@@ -975,19 +1047,41 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
     private static FrameworkElement SectionTitle(string title, string subtitle)
     {
-        var stack = new StackPanel { Margin = new Thickness(2, 0, 0, 10) };
-        stack.Children.Add(Label(title, 18, "#F2F7FB", true));
-        if (!string.IsNullOrWhiteSpace(subtitle)) stack.Children.Add(Label(subtitle, 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
-        return stack;
+        var row = new Grid { Margin = new Thickness(2, 2, 0, 11) };
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(4) });
+        row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        row.Children.Add(new Border
+        {
+            Width = 3,
+            Margin = new Thickness(0, 2, 0, 2),
+            CornerRadius = new CornerRadius(2),
+            Background = Brush("#0AAEFF"),
+            Effect = Glow("#008DFF", 12, 0.50)
+        });
+        var stack = new StackPanel { Margin = new Thickness(10, 0, 0, 0) };
+        var heading = Label(title, 18, "#F7FBFF", true);
+        heading.FontFamily = new FontFamily("Segoe UI Black");
+        heading.FontStyle = FontStyles.Italic;
+        stack.Children.Add(heading);
+        if (!string.IsNullOrWhiteSpace(subtitle)) stack.Children.Add(Label(subtitle, 10.5, "#7899AE", false, new Thickness(0, 2, 0, 0)));
+        Grid.SetColumn(stack, 1);
+        row.Children.Add(stack);
+        return row;
     }
 
     private static void AddStat(Grid grid, int col, string title, string value, string valueColor)
     {
         var card = Card(new Thickness(col == 0 ? 0 : 6, 0, col == 3 ? 0 : 6, 0));
-        var stack = new StackPanel { Margin = new Thickness(17, 14, 17, 14) };
-        stack.Children.Add(Label(title, 10, "#88A5BA", true));
-        stack.Children.Add(Label(value, 15, valueColor, true, new Thickness(0, 5, 0, 0)));
-        card.Child = stack;
+        var root = new Grid { Margin = new Thickness(16, 13, 16, 13) };
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        root.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var statTitle = Label(title, 9.5, "#7899AE", true);
+        root.Children.Add(statTitle);
+        var statValue = Label(value, 15.5, valueColor, true, new Thickness(0, 5, 0, 0));
+        statValue.FontFamily = new FontFamily("Segoe UI Black");
+        Grid.SetRow(statValue, 1);
+        root.Children.Add(statValue);
+        card.Child = root;
         Grid.SetColumn(card, col);
         grid.Children.Add(card);
     }
@@ -1010,6 +1104,59 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
 
     private static string Friendly(string value) =>
         string.Join(' ', (value ?? string.Empty).Replace('_', ' ').Replace('-', ' ').Split(' ', StringSplitOptions.RemoveEmptyEntries));
+
+    private static Brush PageBackground()
+    {
+        var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+        brush.GradientStops.Add(new GradientStop(Color("#020914"), 0.00));
+        brush.GradientStops.Add(new GradientStop(Color("#04131F"), 0.42));
+        brush.GradientStops.Add(new GradientStop(Color("#02101B"), 0.72));
+        brush.GradientStops.Add(new GradientStop(Color("#061827"), 1.00));
+        return brush;
+    }
+
+    private static Brush PanelBackground()
+    {
+        var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+        brush.GradientStops.Add(new GradientStop(Color("#091D2C"), 0.00));
+        brush.GradientStops.Add(new GradientStop(Color("#061521"), 0.52));
+        brush.GradientStops.Add(new GradientStop(Color("#040F19"), 1.00));
+        return brush;
+    }
+
+    private static Brush HeroBackground()
+    {
+        var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
+        brush.GradientStops.Add(new GradientStop(Color("#07121D"), 0.00));
+        brush.GradientStops.Add(new GradientStop(Color("#0A3552"), 0.44));
+        brush.GradientStops.Add(new GradientStop(Color("#06243A"), 0.70));
+        brush.GradientStops.Add(new GradientStop(Color("#020B13"), 1.00));
+        return brush;
+    }
+
+    private static Brush ButtonBackground()
+    {
+        var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(0, 1) };
+        brush.GradientStops.Add(new GradientStop(Color("#0B2E46"), 0.00));
+        brush.GradientStops.Add(new GradientStop(Color("#061725"), 1.00));
+        return brush;
+    }
+
+    private static Brush AccentButtonBackground()
+    {
+        var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 0) };
+        brush.GradientStops.Add(new GradientStop(Color("#006DCC"), 0.00));
+        brush.GradientStops.Add(new GradientStop(Color("#00A7FF"), 1.00));
+        return brush;
+    }
+
+    private static DropShadowEffect Glow(string color, double radius, double opacity) => new()
+    {
+        Color = Color(color),
+        BlurRadius = radius,
+        ShadowDepth = 0,
+        Opacity = opacity
+    };
 
     private static SolidColorBrush Brush(string hex) => new(Color(hex));
     private static Color Color(string hex) => (Color)ColorConverter.ConvertFromString(hex)!;
