@@ -1,6 +1,7 @@
 using System.IO;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Shapes;
 using MXBRaceDayLive.Contracts;
@@ -13,6 +14,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     private TextBlock? _garageBikeText;
     private TextBlock? _garagePaintText;
     private TextBlock? _garageSyncText;
+    private Grid? _pageHost;
+    private ScrollViewer? _profileView;
+    private FrameworkElement? _bikeLibraryView;
     private FileSystemWatcher? _profileWatcher;
     private FileSystemWatcher? _globalWatcher;
     private CancellationTokenSource? _watchRefreshCts;
@@ -20,7 +24,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     private bool _selectionHooked;
 
     public string Id => "profile-home";
-    public Version Version => new(1, 0, 2);
+    public Version Version => new(1, 0, 3);
 
     public FrameworkElement CreateView(IRaceDayContext context)
     {
@@ -54,11 +58,16 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         DisposeWatchers();
         CancelQueuedRefresh();
         _context = null;
+        _pageHost = null;
+        _profileView = null;
+        _bikeLibraryView = null;
     }
 
     private FrameworkElement Build(RiderProfile rider)
     {
-        var root = new ScrollViewer
+        _pageHost = new Grid { Background = Brush("#04101B") };
+
+        _profileView = new ScrollViewer
         {
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
@@ -66,7 +75,8 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         };
 
         var stack = new StackPanel { Margin = new Thickness(34, 26, 34, 34) };
-        root.Content = stack;
+        _profileView.Content = stack;
+        _pageHost.Children.Add(_profileView);
 
         var profileCard = Card(new Thickness(0, 0, 0, 18));
         var profileStack = new StackPanel();
@@ -186,7 +196,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         snapshot.Children.Add(SnapshotCard("LATEST RESULT", "NO RESULTS YET", "Completed results will appear here.", 1));
         stack.Children.Add(snapshot);
 
-        return root;
+        return _pageHost;
     }
 
     private Border BuildGarageCard()
@@ -194,6 +204,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var card = Card(new Thickness(0, 0, 6, 0));
         card.MinHeight = 176;
         card.ClipToBounds = true;
+        card.Cursor = Cursors.Hand;
+        card.ToolTip = "Open the MX Bikes bike library inside Race Day Live";
+        card.MouseLeftButtonUp += async (_, _) => await OpenBikeLibraryAsync();
 
         var root = new Grid();
         card.Child = root;
@@ -249,11 +262,203 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             BorderThickness = new Thickness(0, 1, 0, 0),
             Padding = new Thickness(0, 8, 0, 0)
         };
-        footer.Child = Label("GAME PROFILE → RACE DAY LIVE", 8.5, "#5E8299", true);
+        footer.Child = Label("OPEN MX BIKES BIKE LIBRARY  ›", 8.5, "#079CFF", true);
         Grid.SetRow(footer, 2);
         content.Children.Add(footer);
 
         return card;
+    }
+
+    private async Task OpenBikeLibraryAsync()
+    {
+        var context = _context;
+        var host = _pageHost;
+        var profileView = _profileView;
+        if (context is null || host is null || profileView is null) return;
+
+        profileView.Visibility = Visibility.Collapsed;
+
+        var loading = BuildBikeLibraryShell();
+        _bikeLibraryView = loading;
+        host.Children.Add(loading);
+
+        var body = (loading as Grid)?.Tag as StackPanel;
+        if (body is null) return;
+        body.Children.Clear();
+        body.Children.Add(Label("SCANNING MX BIKES BIKE LIBRARY…", 14, "#88A5BA", true, new Thickness(0, 26, 0, 0)));
+
+        try
+        {
+            var current = await context.MXBikes.ReadActiveSelectionAsync();
+            var content = await context.MXBikes.ScanInstalledContentAsync();
+            var bikes = content
+                .Where(x => string.Equals(x.ContentType, "BIKE", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(x => Friendly(x.DisplayName), StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+
+            body.Children.Clear();
+            body.Children.Add(BuildLibrarySummary(bikes.Length, current));
+
+            if (bikes.Length == 0)
+            {
+                var empty = Card(new Thickness(0, 16, 0, 0));
+                empty.Child = new StackPanel
+                {
+                    Margin = new Thickness(22),
+                    Children =
+                    {
+                        Label("NO BIKES FOUND", 17, "#F2F7FB", true),
+                        Label("Race Day Live did not find readable bike entries in the MX Bikes install/mod bike folders.", 12, "#88A5BA", false, new Thickness(0, 6, 0, 0))
+                    }
+                };
+                body.Children.Add(empty);
+                return;
+            }
+
+            var wrap = new WrapPanel { Margin = new Thickness(0, 16, 0, 0) };
+            foreach (var bike in bikes)
+                wrap.Children.Add(BuildBikeTile(bike, current));
+            body.Children.Add(wrap);
+        }
+        catch (Exception ex)
+        {
+            body.Children.Clear();
+            var error = Card(new Thickness(0, 20, 0, 0));
+            error.Child = new StackPanel
+            {
+                Margin = new Thickness(22),
+                Children =
+                {
+                    Label("BIKE LIBRARY COULD NOT LOAD", 17, "#FF5964", true),
+                    Label(ex.Message, 12, "#88A5BA", false, new Thickness(0, 6, 0, 0))
+                }
+            };
+            body.Children.Add(error);
+        }
+    }
+
+    private FrameworkElement BuildBikeLibraryShell()
+    {
+        var page = new Grid { Background = Brush("#04101B") };
+        page.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        page.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var top = new Border
+        {
+            Background = Brush("#061725"),
+            BorderBrush = Brush("#155273"),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Padding = new Thickness(30, 22, 30, 20)
+        };
+        var topGrid = new Grid();
+        topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        topGrid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        top.Child = topGrid;
+
+        var back = new Button
+        {
+            Content = "‹  BACK TO PROFILE",
+            Background = Brush("#0A2235"),
+            Foreground = Brush("#F2F7FB"),
+            BorderBrush = Brush("#155273"),
+            BorderThickness = new Thickness(1),
+            Padding = new Thickness(16, 9, 16, 9),
+            Cursor = Cursors.Hand,
+            FontFamily = new FontFamily("Segoe UI Semibold")
+        };
+        back.Click += (_, _) => CloseBikeLibrary();
+        topGrid.Children.Add(back);
+
+        var title = new StackPanel { Margin = new Thickness(24, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+        title.Children.Add(Label("MX BIKES GARAGE", 24, "#F2F7FB", true));
+        title.Children.Add(Label("Installed bikes loaded directly into Race Day Live — MX Bikes stays closed.", 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
+        Grid.SetColumn(title, 1);
+        topGrid.Children.Add(title);
+        Grid.SetRow(top, 0);
+        page.Children.Add(top);
+
+        var scroll = new ScrollViewer
+        {
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled
+        };
+        var body = new StackPanel { Margin = new Thickness(32, 26, 32, 36) };
+        scroll.Content = body;
+        Grid.SetRow(scroll, 1);
+        page.Children.Add(scroll);
+        page.Tag = body;
+        return page;
+    }
+
+    private FrameworkElement BuildLibrarySummary(int bikeCount, MXBikeSelection current)
+    {
+        var summary = Card(new Thickness(0));
+        summary.Background = new LinearGradientBrush(Color("#0A2D44"), Color("#06131F"), 25);
+        var grid = new Grid { Margin = new Thickness(22, 18, 22, 18) };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        summary.Child = grid;
+
+        var left = new StackPanel();
+        left.Children.Add(Label("CURRENT MX BIKES BIKE", 9, "#079CFF", true));
+        left.Children.Add(Label(string.IsNullOrWhiteSpace(current.BikeId) ? "NO BIKE SELECTED" : Friendly(current.BikeId), 20, "#F2F7FB", true, new Thickness(0, 5, 0, 0)));
+        left.Children.Add(Label(string.IsNullOrWhiteSpace(current.BikePaint) ? "Default paint" : Friendly(current.BikePaint), 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
+        grid.Children.Add(left);
+
+        var right = new StackPanel { VerticalAlignment = VerticalAlignment.Center, HorizontalAlignment = HorizontalAlignment.Right };
+        right.Children.Add(Label("BIKES FOUND", 9, "#88A5BA", true));
+        right.Children.Add(Label(bikeCount.ToString(), 25, "#2BD672", true));
+        Grid.SetColumn(right, 1);
+        grid.Children.Add(right);
+        return summary;
+    }
+
+    private FrameworkElement BuildBikeTile(MXContentItem bike, MXBikeSelection current)
+    {
+        var selected = string.Equals(bike.Id, current.BikeId, StringComparison.OrdinalIgnoreCase);
+        var card = new Border
+        {
+            Width = 260,
+            MinHeight = 132,
+            Margin = new Thickness(0, 0, 14, 14),
+            Padding = new Thickness(17),
+            Background = selected ? Brush("#0B3149") : Brush("#071A29"),
+            BorderBrush = selected ? Brush("#079CFF") : Brush("#155273"),
+            BorderThickness = new Thickness(selected ? 2 : 1),
+            CornerRadius = new CornerRadius(14)
+        };
+
+        var stack = new StackPanel();
+        card.Child = stack;
+
+        var header = new Grid();
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        header.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        header.Children.Add(Label(selected ? "CURRENT BIKE" : "MX BIKES BIKE", 8.5, selected ? "#2BD672" : "#079CFF", true));
+        var package = Label(bike.IsPackaged ? "PKZ" : "FOLDER", 8, bike.IsReadableByRaceDayLive ? "#88A5BA" : "#F4C542", true);
+        Grid.SetColumn(package, 1);
+        header.Children.Add(package);
+        stack.Children.Add(header);
+
+        var bikeName = Label(Friendly(bike.DisplayName), 16, "#F2F7FB", true, new Thickness(0, 12, 0, 5));
+        bikeName.TextWrapping = TextWrapping.Wrap;
+        stack.Children.Add(bikeName);
+        stack.Children.Add(Label(bike.IsReadableByRaceDayLive ? "Installed · available to Race Day Live" : "Installed · protected package", 10, bike.IsReadableByRaceDayLive ? "#88A5BA" : "#F4C542"));
+
+        return card;
+    }
+
+    private void CloseBikeLibrary()
+    {
+        var host = _pageHost;
+        var profile = _profileView;
+        if (host is null || profile is null) return;
+        if (_bikeLibraryView is not null)
+        {
+            host.Children.Remove(_bikeLibraryView);
+            _bikeLibraryView = null;
+        }
+        profile.Visibility = Visibility.Visible;
     }
 
     private async Task RefreshMXBStateAsync(bool reconfigureWatchers, CancellationToken cancellationToken)
