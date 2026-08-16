@@ -17,7 +17,7 @@ Fresh native Windows rebuild. The previous Python-hosted application is intentio
 
 ## Theme direction
 
-Theme work must preserve the existing page structure and feature order unless the user explicitly asks for a layout change. The v1.0.16 correction restores the pre-v1.0.15 layout and applies visual treatment only: race-night color, glow, panel treatment, typography, and existing profile/banner imagery. No sidebar, dashboard rearrangement, new module, or new feature should be introduced as part of a theme-only pass.
+Theme work must preserve the existing page structure and feature order unless the user explicitly asks for a layout change. The v1.0.17 theme pass keeps the current layout intact while using the supplied MXB Race Day Live reference artwork directly inside the existing hero/banner treatment, adds image-backed Garage and Settings cards, image-backed sub-page headers, brighter cyan game-HUD borders, stronger glow, and a faint cinematic motocross backdrop. No sidebar, dashboard rearrangement, new module, or new feature is introduced as part of this theme-only pass.
 
 ## First checkpoint
 
