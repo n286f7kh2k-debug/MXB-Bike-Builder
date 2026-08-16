@@ -1,6 +1,6 @@
 {
   "version": "0.3.3",
   "filename": "MXB_Race_Day_Live_v0_3_3_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.3.3: adds automatic MX Bikes/Steam detection, an in-app game launcher, per-race synced bike selection, saved server-enforced race bike choices, live race-server readiness, and one-click PiBoSo direct-connect joining while preserving the existing updater, memberships, race economics, track media, live timing, results and admin server controls.",
-  "builder_script": "race-control/build_v033_game_extension.py"
+  "notes": "Inspection pass only; no release publication.",
+  "builder_script": "race-control/inspect_v033_profile_bikes.py"
 }
