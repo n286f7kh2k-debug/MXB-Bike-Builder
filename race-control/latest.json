@@ -1,6 +1,6 @@
 {
-  "version": "0.3.9",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_9_UPDATE.zip",
-  "sha256": "4f4243fea7d75ddcaa294a65a2796bdf0a75ec59a407900db7875cfd89cb9d19",
-  "notes": "MXB Race Day Live v0.3.9: Garage no longer launches MX Bikes, Steam, testing mode, or any external game window. The Garage 3D viewport is now an actual in-app renderer for readable source geometry while all installed bikes, paints and gear remain selectable/synced to the native MX Bikes profile. Compiled EDF-only geometry is treated as opaque instead of launching/crashing MX Bikes. Windows desktop/taskbar identity is also rebuilt around the desktop shortcut actual IconLocation so the live taskbar uses the same logo source. Existing updater/restart, race joining, memberships, economics, track art and performance caches are preserved."
+  "version": "0.5.0",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_5_0_UPDATE.zip",
+  "sha256": "ae046382961b260bee4a8db7ea7f14a9c8703a14fbc0838d26de38749e632ea8",
+  "notes": "MXB Race Day Live v0.5.0: unifies the in-app updater onto the Race Day Live channel, moves the version above the legacy MXB Bike Builder 0.4.x line so updates can no longer be blocked by the old product version, bypasses stale GitHub manifest caching, verifies SHA-256 before install, installs without deleting rider/settings data, and restarts through the hidden Windows launcher. Existing Race Day Live features from v0.3.9 are preserved."
 }
