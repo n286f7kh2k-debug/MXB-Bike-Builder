@@ -21,7 +21,7 @@ new_confirm = """        def confirm():
             except Exception as exc:messagebox.showerror('Membership','Race registered, but the membership rebate could not be completed: '+str(exc),parent=dlg); return
             now=datetime.now().replace(microsecond=0).isoformat()
             self.conn.execute('INSERT INTO payment_transactions(rider_id,race_id,provider,provider_ref,amount,status,created_at) VALUES(?,?,?,?,?,?,?)',(rider['id'],race['id'],'RACE_WALLET',None,race['entry_fee'],'PAID',now)); self.conn.commit()
-            dlg.destroy(); messagebox.showinfo('Gate Reserved',f"You are officially registered.\nWallet remaining: ${newbal:,.2f}"); self.open_race_details(race['id'])
+            dlg.destroy(); messagebox.showinfo('Gate Reserved',f"You are officially registered.\\nWallet remaining: ${newbal:,.2f}"); self.open_race_details(race['id'])
         confirm_text=f"CONFIRM MEMBER ENTRY • ${member_entry:.2f}" if quote['eligible'] else f"CONFIRM ENTRY • ${race['entry_fee']:.2f}"
         tk.Button(dlg,text=confirm_text,command=confirm,bg=GREEN if quote['eligible'] else ACCENT,fg='white',relief='flat',font=('Segoe UI Black',11),pady=10,cursor='hand2').pack(fill='x',padx=24)
 """
