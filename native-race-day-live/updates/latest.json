@@ -1,7 +1,7 @@
 {
-  "version": "1.0.9",
-  "moduleUrl": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/native-rebuild/native-race-day-live/updates/modules/1.0.9/MXBRaceDayLive.Profile.dll",
-  "sha256": "117032ebf24b6d4a20b8a57e0744bf57b1a8344ae02a4ed512293a3a84955509",
+  "version": "1.0.10",
+  "moduleUrl": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/native-rebuild/native-race-day-live/updates/modules/1.0.10/MXBRaceDayLive.Profile.dll",
+  "sha256": "22b5cba490d05d7e89583d1902c20a97f93471766d764c047ac9f8b64469e285",
   "featureAssembly": "MXBRaceDayLive.Profile.dll",
-  "notes": "MXB Race Day Live profile-home module v1.0.9. Applies live inside the running native app without restarting the shell."
+  "notes": "MXB Race Day Live profile-home module v1.0.10. Applies live inside the running native app without restarting the shell."
 }
