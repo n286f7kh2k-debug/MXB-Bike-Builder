@@ -3,5 +3,5 @@
   "filename": "MXB_Race_Day_Live_v0_5_2_UPDATE.zip",
   "notes": "MXB Race Day Live v0.5.2: every installed bike gets immediate interactive in-app Garage 3D. Exact readable source geometry and approved creator-authorized registry models take priority; EDF-only bikes use a lightweight bike-specific procedural motocross fallback. No MX Bikes or Steam process is launched. v0.5.1 performance, updater/restart, race joining, memberships, wallet, purse/fastest-lap economics, track art, live timing and admin controls are preserved.",
   "builder_script": "race-control/build_v052_universal_garage.py",
-  "rebuild_attempt": 1
+  "rebuild_attempt": 2
 }
