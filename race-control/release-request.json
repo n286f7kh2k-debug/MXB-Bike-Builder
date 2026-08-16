@@ -1,7 +1,7 @@
 {
-  "version": "0.5.0",
-  "filename": "MXB_Race_Day_Live_v0_5_0_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.0 targeted UI method inspection pass.",
-  "builder_script": "race-control/inspect_v050_methods.py",
-  "rebuild_attempt": "method-inspection"
+  "version": "0.5.1",
+  "filename": "MXB_Race_Day_Live_v0_5_1_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.1: performance hotfix and Garage renderer rebuild. Garage rendering moves off the Tk UI thread into one background worker, redraws are debounced and bounded, queued Garage work stops when leaving the page, and Windows shell icon discovery is cached. Existing v0.5.0 updater/restart, race joining, memberships, wallet, purse/fastest-lap economics, track art, live timing and admin controls are preserved.",
+  "builder_script": "race-control/build_v051_garage_speed.py",
+  "rebuild_attempt": 1
 }
