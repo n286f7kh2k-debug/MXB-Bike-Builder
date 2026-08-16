@@ -1,0 +1,77 @@
+name: Build Native MXB Race Day Live
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - 'native-race-day-live/**'
+      - 'race-control/launcher/mxb_race_day_live.ico'
+      - '.github/workflows/native-race-day-live-build.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-native-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout native rebuild
+        uses: actions/checkout@v4
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore contracts
+        run: dotnet restore native-race-day-live/src/MXBRaceDayLive.Contracts/MXBRaceDayLive.Contracts.csproj
+
+      - name: Build hot-swappable profile module
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path native-out/profile-build | Out-Null
+          dotnet build native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj -c Release -o native-out/profile-build
+
+      - name: Publish native Windows shell
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path native-out/app | Out-Null
+          dotnet publish native-race-day-live/src/MXBRaceDayLive.Shell/MXBRaceDayLive.Shell.csproj `
+            -c Release -r win-x64 --self-contained true `
+            -p:PublishReadyToRun=true `
+            -o native-out/app
+
+      - name: Install bundled profile module
+        shell: pwsh
+        run: |
+          $moduleDir = 'native-out/app/Modules/Bundled'
+          New-Item -ItemType Directory -Force -Path $moduleDir | Out-Null
+          Copy-Item 'native-out/profile-build/MXBRaceDayLive.Profile.dll' "$moduleDir/MXBRaceDayLive.Profile.dll" -Force
+
+      - name: Validate native foundation
+        shell: pwsh
+        run: |
+          $exe = 'native-out/app/MXB Race Day Live.exe'
+          $module = 'native-out/app/Modules/Bundled/MXBRaceDayLive.Profile.dll'
+          if (!(Test-Path $exe)) { throw 'MXB Race Day Live.exe was not produced' }
+          if (!(Test-Path $module)) { throw 'Profile feature module was not produced' }
+          $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $exe))
+          if ($info.ProductName -ne 'MXB Race Day Live') { throw "Wrong ProductName: $($info.ProductName)" }
+          if ($info.FileDescription -ne 'MXB Race Day Live') { throw "Wrong FileDescription: $($info.FileDescription)" }
+          if ((Get-Item $exe).Length -lt 100000) { throw 'Native executable is unexpectedly small' }
+          Write-Host "Validated native executable: $($info.ProductName) v$($info.FileVersion)"
+          Write-Host 'Python runtime is not part of this project or launch path.'
+
+      - name: Package checkpoint
+        shell: pwsh
+        run: |
+          Compress-Archive -Path 'native-out/app/*' -DestinationPath 'native-out/MXB_Race_Day_Live_NATIVE_v1_0_0.zip' -Force
+
+      - name: Upload native checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: MXB-Race-Day-Live-Native-v1.0.0
+          path: native-out/MXB_Race_Day_Live_NATIVE_v1_0_0.zip
+          if-no-files-found: error
+          retention-days: 30
