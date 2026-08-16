@@ -1,6 +1,6 @@
 {
-  "version": "0.3.5",
-  "filename": "MXB_Race_Day_Live_v0_3_5_UPDATE.zip",
-  "notes": "Hot-path inspection only; no release publication.",
-  "builder_script": "race-control/inspect_v035_hotpaths.py"
+  "version": "0.3.6",
+  "filename": "MXB_Race_Day_Live_v0_3_6_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.3.6: adds a dedicated top-level Garage with every installed MX Bikes bike supported through a hidden in-app EDF-compatible backend renderer, plus a whole-app performance pass covering content scanning, images, game discovery, track-media cache, navigation, renderer lifecycle and the one-second LIVE timing tower.",
+  "builder_script": "race-control/build_v036_garage_performance.py"
 }
