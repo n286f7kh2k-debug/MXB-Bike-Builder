@@ -1,0 +1,71 @@
+name: Patch v1.0.9 iNsane runtime
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/patch-v109-insane-runtime.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+
+      - name: Patch iNsane process launch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'native-race-day-live/src/MXBRaceDayLive.Profile/InsaneBikePreviewProvider.cs'
+          $source = Get-Content $path -Raw
+
+          $old = @'
+            var process = Process.Start(new ProcessStartInfo(executable)
+            {
+                UseShellExecute = true,
+                WorkingDirectory = Path.GetDirectoryName(executable) ?? string.Empty,
+                WindowStyle = ProcessWindowStyle.Hidden
+            }) ?? throw new InvalidOperationException("Race Day Live could not start its internal iNsane preview component.");
+'@
+
+          $new = @'
+            var runtimeRoot = await InsaneDotNetRuntime.EnsureAsync(cancellationToken);
+            var startInfo = new ProcessStartInfo(executable)
+            {
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(executable) ?? string.Empty,
+                WindowStyle = ProcessWindowStyle.Hidden
+            };
+            startInfo.Environment.Remove("DOTNET_ROOT");
+            startInfo.Environment.Remove("DOTNET_ROOT_X64");
+            startInfo.Environment["DOTNET_ROOT"] = runtimeRoot;
+            startInfo.Environment["DOTNET_ROOT_X64"] = runtimeRoot;
+            startInfo.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";
+
+            var process = Process.Start(startInfo)
+                ?? throw new InvalidOperationException("Race Day Live could not start its internal iNsane preview component.");
+'@
+
+          if (-not $source.Contains($old)) { throw 'Could not find old iNsane Process.Start block' }
+          $source = $source.Replace($old, $new)
+          [System.IO.File]::WriteAllText((Resolve-Path $path), $source)
+
+          $projectPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj'
+          [xml]$project = Get-Content $projectPath -Raw
+          $project.Project.PropertyGroup.Version = '1.0.9'
+          $project.Save((Resolve-Path $projectPath))
+
+      - name: Commit patch
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/InsaneBikePreviewProvider.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          git commit -m "Use private .NET 6 runtime for embedded iNsane viewer"
+          git push origin native-rebuild
