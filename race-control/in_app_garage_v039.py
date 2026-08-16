@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import math
-import os
 from pathlib import Path
 
 
@@ -39,7 +38,6 @@ class ObjModel:
                         a=idx[0]
                         for j in range(1,len(idx)-1):faces.append((a,idx[j],idx[j+1]))
         if len(verts)<3 or not faces:raise GarageModelError('Readable OBJ geometry was not found.')
-        # Keep UI responsive on huge source meshes.
         if len(faces)>45000:
             step=max(1,len(faces)//45000); faces=faces[::step]
         self.vertices=verts; self.faces=faces
@@ -53,11 +51,11 @@ class ObjModel:
 
 
 class InAppGarageRenderer:
-    """Small software 3D renderer that lives entirely inside the Tk Garage page.
+    """Software 3D renderer owned entirely by Race Day Live.
 
-    It intentionally never launches Steam or mxbikes.exe. It renders readable source
-    geometry when a mod includes it next to the compiled EDF. Compiled EDF is treated
-    as opaque and never passed to an external process.
+    This class never starts Steam, MX Bikes, testing mode, or any external process.
+    It renders readable source geometry when a bike package includes it and treats
+    compiled EDF as opaque.
     """
     SOURCE_EXTS=('.obj',)
 
@@ -67,8 +65,20 @@ class InAppGarageRenderer:
         self.yaw=-0.65; self.pitch=-0.18; self.zoom=1.0
         self._drag=None
 
+    @property
+    def running(self):
+        return self.model is not None
+
+    def stop(self):
+        self.model=None; self.model_path=None; self._drag=None
+
+    def resize(self,*_args,**_kwargs):
+        return None
+
+    def focus(self,*_args,**_kwargs):
+        return None
+
     def source_for_bike(self,bike_id):
-        # Prefer source geometry living with the selected bike. Never decode/launch EDF.
         roots=[]
         try:
             for rec in self.garage.bike_records():
@@ -78,7 +88,7 @@ class InAppGarageRenderer:
         except Exception:pass
         try:
             mods=self.garage.mods_root()
-            if mods: roots.extend([Path(mods)/'bikes'/str(bike_id),Path(mods)/'Bikes'/str(bike_id)])
+            if mods:roots.extend([Path(mods)/'bikes'/str(bike_id),Path(mods)/'Bikes'/str(bike_id)])
         except Exception:pass
         seen=set()
         for root in roots:
@@ -87,10 +97,8 @@ class InAppGarageRenderer:
                 key=str(root.resolve()).lower()
                 if key in seen or not root.is_dir():continue
                 seen.add(key)
-                preferred=[root/'model.obj',root/(str(bike_id)+'.obj')]
-                for p in preferred:
+                for p in (root/'model.obj',root/(str(bike_id)+'.obj')):
                     if p.is_file():return p
-                # Source packs sometimes leave an OBJ in a source/template subfolder.
                 for sub in ('source','Source','template','Template','3d','3D'):
                     d=root/sub
                     if d.is_dir():
@@ -119,7 +127,7 @@ class InAppGarageRenderer:
             self.yaw=yaw+(e.x-x)*0.012
             self.pitch=max(-1.25,min(1.25,pitch+(e.y-y)*0.009))
             redraw()
-        def up(e):self._drag=None
+        def up(_e):self._drag=None
         def wheel(e):
             self.zoom=max(0.45,min(2.8,self.zoom*(1.0+(0.12 if e.delta>0 else -0.12))))
             redraw()
@@ -130,8 +138,7 @@ class InAppGarageRenderer:
         if self.model is None:return False
         w=max(320,int(width)); h=max(260,int(height)); cx=w/2; cy=h/2
         cyaw,syaw=math.cos(self.yaw),math.sin(self.yaw); cp,sp=math.cos(self.pitch),math.sin(self.pitch)
-        pts=[]
-        scale=min(w,h)*0.38*self.zoom
+        pts=[]; scale=min(w,h)*0.38*self.zoom
         for x,y,z in self.model.vertices:
             x1=x*cyaw-z*syaw; z1=x*syaw+z*cyaw
             y2=y*cp-z1*sp; z2=y*sp+z1*cp
@@ -141,13 +148,11 @@ class InAppGarageRenderer:
         for a,b,c in self.model.faces:
             try:
                 pa,pb,pc=pts[a],pts[b],pts[c]
-                # screen-space backface cull
                 cross=(pb[0]-pa[0])*(pc[1]-pa[1])-(pb[1]-pa[1])*(pc[0]-pa[0])
                 if cross>=0:continue
                 tris.append(((pa[2]+pb[2]+pc[2])/3,(pa,pb,pc)))
             except Exception:pass
         tris.sort(reverse=True,key=lambda x:x[0])
-        # Tk software rendering: neutral shading only; game paints remain handled by selection/profile sync.
         for depth,(pa,pb,pc) in tris:
             shade=max(55,min(205,int(132-depth*28)))
             col=f'#{shade:02x}{shade:02x}{shade:02x}'
