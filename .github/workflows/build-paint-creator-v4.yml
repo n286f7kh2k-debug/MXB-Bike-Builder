@@ -39,6 +39,21 @@ jobs:
           if ($hash -ne '4d4a4e2c81b4210530d1993da89a859ea02f3c4eb870748de3ef85dabd1bd7c9') { throw "SOURCE HASH MISMATCH: $hash" }
           $src = Join-Path $env:RUNNER_TEMP 'paint-v4-source'
           Expand-Archive -Path $zip -DestinationPath $src -Force
+
+          # Explicit imports for WPF temporary compile project.
+          $ioFiles = @(
+            'src\MXBRaceDayLive.PaintCreator\Services\RiderGearSetStore.cs',
+            'src\MXBRaceDayLive.PaintCreator\Monetization\ProjectFingerprintService.cs',
+            'src\MXBRaceDayLive.PaintCreator\Services\ObjUvMeshLoader.cs'
+          )
+          foreach ($rel in $ioFiles) {
+            $file = Join-Path $src $rel
+            $text = Get-Content -Raw -LiteralPath $file
+            if ($text -notmatch '(?m)^using System\.IO;') {
+              Set-Content -LiteralPath $file -Value ("using System.IO;`r`n" + $text) -Encoding utf8
+            }
+          }
+
           "SRC=$src" >> $env:GITHUB_ENV
 
       - name: Build self-contained Windows app
