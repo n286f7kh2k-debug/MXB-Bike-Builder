@@ -1,6 +1,6 @@
 {
-  "version": "6.0.0",
-  "url": "https://api.github.com/repos/n286f7kh2k-debug/MXB-Bike-Builder/contents/paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v6_0_0.zip?ref=build%2Frace-day-live-paint-creator",
-  "sha256": "212e64f5a4d0455dba5448f8718b9daa2ea3ed8f7dd75e05fe4a436c3a26cb4e",
-  "notes": "Paint Creator v6: in-app hot update button, automatic update checks, fixed single gear navigation, working Designs library, real MX Bikes rider 3D UV viewer."
+  "version": "7.0.0",
+  "url": "https://api.github.com/repos/n286f7kh2k-debug/MXB-Bike-Builder/contents/paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v7_0_0.zip?ref=build%2Frace-day-live-paint-creator",
+  "sha256": "034f7f5baa556bb3b367b1c0eabb44399e34ad9aa15608d22f28a859384f85f8",
+  "notes": "v7 Creator Hub: simpler MXB Hub-style navigation with Create, Shop, Free Mods, Creators and Setups; card browsing; creator drafts; setup imports; existing 3D customizer and hot update state preserved."
 }
