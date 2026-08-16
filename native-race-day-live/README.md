@@ -17,7 +17,7 @@ Fresh native Windows rebuild. The previous Python-hosted application is intentio
 
 ## Theme direction
 
-The existing UI now uses a fixed game-dashboard composition rather than the old long vertical utility layout: left-side navigation, compact HUD modules, image-backed rider identity when profile images exist, electric-blue accents, compact glowing borders, stronger hierarchy, and aggressive motocross-style typography. Theme passes must restyle existing screens without adding product sections or functionality unless explicitly requested. The v1.0.15 dashboard pass keeps the existing feature set intact while changing the page composition to match the supplied game-UI reference much more closely.
+Theme work must preserve the existing page structure and feature order unless the user explicitly asks for a layout change. The v1.0.16 correction restores the pre-v1.0.15 layout and applies visual treatment only: race-night color, glow, panel treatment, typography, and existing profile/banner imagery. No sidebar, dashboard rearrangement, new module, or new feature should be introduced as part of a theme-only pass.
 
 ## First checkpoint
 
