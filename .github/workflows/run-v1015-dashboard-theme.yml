@@ -1,0 +1,33 @@
+name: Apply v1.0.15 Dashboard Theme
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/scripts/patch_v1015_dashboard_theme.py'
+      - '.github/workflows/run-v1015-dashboard-theme.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+      - name: Apply dashboard layout theme
+        run: python .github/scripts/patch_v1015_dashboard_theme.py
+      - name: Commit dashboard theme
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Rebuild existing UI as game dashboard v1.0.15"
+          git push origin native-rebuild
