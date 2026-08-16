@@ -33,15 +33,9 @@ jobs:
           $source = 'race-control/launcher/MXBRaceDayLiveLauncher.cs'
           $out = 'race-control/staging/MXB Race Day Live.exe'
           if (-not (Test-Path $source)) { throw 'launcher source missing' }
-          $candidates = @(
-            "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
-            "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-          )
-          $csc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
-          if (-not $csc) { throw 'C# compiler not found on Windows runner' }
-          Write-Host "Compiler: $csc"
-          & $csc /nologo /target:winexe /optimize+ /platform:anycpu "/out:$out" $source
-          if ($LASTEXITCODE -ne 0) { throw "csc failed with exit code $LASTEXITCODE" }
+          Remove-Item $out -Force -ErrorAction SilentlyContinue
+          $code = Get-Content $source -Raw
+          Add-Type -TypeDefinition $code -Language CSharp -OutputAssembly $out -OutputType WindowsApplication
           if (-not (Test-Path $out)) { throw 'branded launcher output missing' }
 
       - name: Validate branded launcher identity
