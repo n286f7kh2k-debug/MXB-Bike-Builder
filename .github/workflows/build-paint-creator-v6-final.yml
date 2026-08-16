@@ -1,0 +1,35 @@
+name: Build Paint Creator v6 Final
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths:
+      - 'ci-paint-v6-clean/**'
+      - '.github/workflows/build-paint-creator-v6-final.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build test and package v6
+        shell: pwsh
+        run: ./ci-paint-v6-clean/build-v6.ps1
+      - name: Publish update feed
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add paint-creator
+          git diff --cached --quiet
+          if ($LASTEXITCODE -ne 0) {
+            git commit -m 'Publish Paint Creator v6 hot-update feed [skip ci]'
+            git push origin HEAD:build/race-day-live-paint-creator
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MXB-Race-Day-Live-Paint-Creator-v6.0.0-HOT-UPDATE
+          path: ${{ env.OUT }}
+          if-no-files-found: error
+          retention-days: 7
