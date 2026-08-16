@@ -20,24 +20,11 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path race-control/staging | Out-Null
-          $sources = @(
-            'race-control/releases/MXB_Race_Day_Live_v0_5_10_UPDATE.zip',
-            'race-control/releases/MXB_Race_Day_Live_v0_5_6_UPDATE.zip',
-            'race-control/releases/MXB_Race_Day_Live_v0_3_9_UPDATE.zip',
-            'race-control/releases/MXB_Race_Day_Live_v0_2_0_UPDATE.zip'
-          )
-          $icon = $null
-          foreach ($archive in $sources) {
-            if (-not (Test-Path $archive)) { continue }
-            $dest = Join-Path $env:RUNNER_TEMP ('rdl-icon-' + [IO.Path]::GetFileNameWithoutExtension($archive))
-            Remove-Item $dest -Recurse -Force -ErrorAction SilentlyContinue
-            Expand-Archive -Path $archive -DestinationPath $dest -Force
-            $icon = Get-ChildItem $dest -Recurse -Filter '*.ico' -File -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty FullName
-            if ($icon) { Write-Host "Launcher icon source: $icon"; break }
-          }
-          if (-not $icon) { throw 'No MXB Race Day Live .ico found in release history' }
+          $icon = 'race-control/launcher/mxb_race_day_live.ico'
+          if (-not (Test-Path $icon)) { throw 'MXB Race Day Live launcher icon asset missing' }
           Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
           if (-not (Test-Path 'race-control/staging/rdl-launcher.ico')) { throw 'launcher icon staging failed' }
+          Write-Host "Launcher icon source: $icon"
 
       - name: Compile branded launcher
         shell: pwsh
