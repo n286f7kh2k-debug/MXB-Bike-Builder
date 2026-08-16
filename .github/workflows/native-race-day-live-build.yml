@@ -12,6 +12,10 @@ on:
       - '.github/workflows/native-race-day-live-build.yml'
   workflow_dispatch:
 
+concurrency:
+  group: native-race-day-live-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
 
