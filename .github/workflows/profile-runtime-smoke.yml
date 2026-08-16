@@ -1,0 +1,35 @@
+name: Smoke Test Hot Profile Module
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - 'native-race-day-live/src/MXBRaceDayLive.Profile/**'
+      - 'native-race-day-live/src/MXBRaceDayLive.Profile.Smoke/**'
+      - 'native-race-day-live/src/MXBRaceDayLive.Contracts/**'
+      - '.github/workflows/profile-runtime-smoke.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: profile-runtime-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout native rebuild
+        uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Run WPF profile runtime smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet run --project native-race-day-live/src/MXBRaceDayLive.Profile.Smoke/MXBRaceDayLive.Profile.Smoke.csproj -c Release
