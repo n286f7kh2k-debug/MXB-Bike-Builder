@@ -1,0 +1,85 @@
+name: Probe Helix Assimp FBX
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - build/race-day-live-paint-creator
+    paths:
+      - '.github/workflows/probe-helix-assimp-fbx.yml'
+
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official MX Bikes rider FBX
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $root = Join-Path $env:RUNNER_TEMP 'fbx-probe'
+          New-Item -ItemType Directory -Force -Path $root | Out-Null
+          $zip = Join-Path $root 'rider.zip'
+          Invoke-WebRequest -Uri 'https://www.mx-bikes.com/downloads/mxb_rider_templates.zip' -OutFile $zip -UseBasicParsing
+          Expand-Archive -LiteralPath $zip -DestinationPath (Join-Path $root 'rider') -Force
+          $fbx = Get-ChildItem -LiteralPath (Join-Path $root 'rider') -Recurse -Filter 'mxb_rider_template.FBX' | Select-Object -First 1
+          if ($null -eq $fbx) { throw 'Official rider FBX not found' }
+          "PROBE_ROOT=$root" >> $env:GITHUB_ENV
+          "RIDER_FBX=$($fbx.FullName)" >> $env:GITHUB_ENV
+      - name: Create .NET reflection/import probe
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $proj = Join-Path $env:PROBE_ROOT 'Probe'
+          dotnet new console -n Probe -o $proj -f net8.0
+          Push-Location $proj
+          dotnet add package HelixToolkit.SharpDX.Assimp --version 3.1.2
+          dotnet add package HelixToolkit.Wpf.SharpDX --version 3.1.2
+          @'
+          using System.Reflection;
+          using System.Runtime.Loader;
+
+          var fbx = Environment.GetEnvironmentVariable("RIDER_FBX")!;
+          var assimpAsm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "HelixToolkit.SharpDX.Assimp")
+              ?? Assembly.Load("HelixToolkit.SharpDX.Assimp");
+          Console.WriteLine($"ASSEMBLY {assimpAsm.FullName}");
+          var types = assimpAsm.GetTypes().Where(t => t.Name.Contains("Importer", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Scene", StringComparison.OrdinalIgnoreCase)).OrderBy(t => t.FullName).ToList();
+          foreach (var t in types)
+          {
+              Console.WriteLine($"TYPE {t.FullName}");
+              foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Where(m => m.Name.Contains("Load", StringComparison.OrdinalIgnoreCase) || m.Name.Contains("Import", StringComparison.OrdinalIgnoreCase)))
+                  Console.WriteLine("  METHOD " + m);
+          }
+
+          var importerType = assimpAsm.GetTypes().FirstOrDefault(t => t.Name == "Importer" && t.GetMethods().Any(m => m.Name == "Load"));
+          if (importerType is null) throw new Exception("Helix importer type not found");
+          var importer = Activator.CreateInstance(importerType)!;
+          var load = importerType.GetMethods().Where(m => m.Name == "Load").OrderBy(m => m.GetParameters().Length).FirstOrDefault(m => {
+              var p = m.GetParameters();
+              return p.Length >= 1 && p[0].ParameterType == typeof(string);
+          });
+          if (load is null) throw new Exception("String Load overload not found");
+          Console.WriteLine("SELECTED " + load);
+          var args = load.GetParameters().Select((p,i) => i == 0 ? (object?)fbx : (p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null))).ToArray();
+          var scene = load.Invoke(importer, args);
+          Console.WriteLine("LOAD_RESULT " + (scene?.GetType().FullName ?? "null"));
+          if (scene is null) throw new Exception("FBX load returned null");
+          foreach (var prop in scene.GetType().GetProperties(BindingFlags.Public|BindingFlags.Instance))
+          {
+              if (prop.Name.Contains("Root", StringComparison.OrdinalIgnoreCase) || prop.Name.Contains("Node", StringComparison.OrdinalIgnoreCase) || prop.Name.Contains("Anim", StringComparison.OrdinalIgnoreCase))
+              {
+                  object? value = null; try { value = prop.GetValue(scene); } catch { }
+                  Console.WriteLine($"SCENE_PROP {prop.Name}={value?.GetType().FullName ?? "null"}");
+              }
+          }
+          '@ | Set-Content -LiteralPath (Join-Path $proj 'Program.cs')
+          dotnet run -c Release *>&1 | Tee-Object -FilePath (Join-Path $env:PROBE_ROOT 'probe.log')
+          Pop-Location
+      - name: Upload probe log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: helix-assimp-mxb-fbx-probe
+          path: ${{ env.PROBE_ROOT }}/probe.log
+          if-no-files-found: warn
+          retention-days: 3
