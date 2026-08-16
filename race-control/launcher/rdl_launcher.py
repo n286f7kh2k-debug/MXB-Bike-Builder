@@ -5,11 +5,6 @@ import sys
 from pathlib import Path
 
 
-def _quote(value: str) -> str:
-    value = str(value)
-    return '"' + value.replace('"', '\\"') + '"'
-
-
 def _runtime_path(root: Path) -> Path | None:
     hint = root / 'assets' / 'bin' / 'rdl_runtime.txt'
     try:
@@ -40,15 +35,15 @@ def main() -> int:
     if runtime is None or not app.is_file():
         return 2
 
-    args = [_quote(str(app))]
-    args.extend(_quote(arg) for arg in sys.argv[1:])
     try:
-        proc = subprocess.Popen(
+        subprocess.Popen(
             [str(runtime), str(app), *sys.argv[1:]],
             cwd=str(root),
             creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+            close_fds=True,
         )
-        return proc.wait()
+        # Exit immediately so the in-app updater can replace this launcher on future updates.
+        return 0
     except Exception:
         return 4
 
