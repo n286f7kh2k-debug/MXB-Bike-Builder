@@ -1,6 +1,6 @@
 {
   "version": "0.5.14",
   "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_5_14_UPDATE.zip",
-  "sha256": "253ecb4a7b2c83fcca3adec8455236836f225c25125607084b8ebd7d75807048",
+  "sha256": "3b574041e798267a5c2016b1121377f32620b7057409a3522ae835642b65b828",
   "notes": "MXB Race Day Live v0.5.14 is a startup recovery release for the v0.5.13 host regression. It preserves the v0.5.13 profile-first race-night UI and all app data/features, but restores the last known-good external pythonw launch model so cold launches work again. The recovery launcher strips inherited PyInstaller _PYI_/PYINSTALLER environment state before starting the app runtime, preventing the parent-process executable security validation failure seen immediately after v0.5.13. The in-process host that produced the tkinter ttk/messagebox/filedialog import failure is removed. Stable AppUserModelID/window icon handling from the earlier working shell integration is restored. Garage/model rendering changes are intentionally not included in this emergency recovery release."
 }
