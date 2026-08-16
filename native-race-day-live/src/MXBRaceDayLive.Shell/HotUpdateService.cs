@@ -1,3 +1,4 @@
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text.Json;
 using MXBRaceDayLive.Contracts;
@@ -25,8 +26,6 @@ public sealed class HotUpdateService : IUpdateService, IDisposable
 
     public event EventHandler<string>? UpdateStatusChanged;
 
-    // The shell supplies this callback. A verified module is activated inside the already-open
-    // window first. Only after that succeeds is it saved as the startup module.
     public Func<string, Version, CancellationToken, Task>? ActivateModuleAsync { get; set; }
 
     public string ResolveActiveModule(string bundledModule)
@@ -85,8 +84,6 @@ public sealed class HotUpdateService : IUpdateService, IDisposable
             await File.WriteAllBytesAsync(staged, bytes, cancellationToken);
             File.Move(staged, final, true);
 
-            // This is the important no-restart transaction. The new feature must successfully
-            // construct and render before the persisted pointer changes.
             Status($"Applying v{next} live…");
             await ActivateModuleAsync(final, next, cancellationToken);
 
@@ -104,7 +101,6 @@ public sealed class HotUpdateService : IUpdateService, IDisposable
         }
         catch (Exception ex)
         {
-            // The active module was not switched permanently if activation failed.
             Status("Update failed · current version kept");
             System.Diagnostics.Debug.WriteLine(ex);
         }
