@@ -18,38 +18,34 @@ jobs:
           ref: native-rebuild
           fetch-depth: 0
 
-      - name: Wire Frost renderer fallback
+      - name: Fix automation type ambiguity
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $viewerPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/BikeModelViewer.cs'
-          $viewer = Get-Content $viewerPath -Raw
-          $pattern = 'var bundle = await Task\.Run\(\(\) => ResolveBundle\(bike\), cancellationToken\);\r?\n\s*var decoder = await EnsureDecoderAsync\(cancellationToken\);'
-          $replacement = "var bundle = await Task.Run(() => ResolveBundle(bike), cancellationToken);`n        if (FrostBikePreviewProvider.RequiresFrost(bundle.EdfFiles))`n            return await FrostBikePreviewProvider.CreateAsync(bike, bundle.SourcePath, cancellationToken);`n`n        var decoder = await EnsureDecoderAsync(cancellationToken);"
-          $updated = [regex]::Replace($viewer, $pattern, $replacement, 1)
-          if ($updated -eq $viewer) { throw 'BikeModelViewer CreateAsync insertion point was not found' }
-          [System.IO.File]::WriteAllText((Resolve-Path $viewerPath), $updated)
+          $path = 'native-race-day-live/src/MXBRaceDayLive.Profile/FrostBikePreviewProvider.cs'
+          $source = Get-Content $path -Raw
+          $updated = $source.Replace('Condition.TrueCondition', 'System.Windows.Automation.Condition.TrueCondition')
+          if ($updated -eq $source) { throw 'Automation Condition insertion point was not found' }
+          [System.IO.File]::WriteAllText((Resolve-Path $path), $updated)
 
-      - name: Bump profile module and add UI Automation references
+      - name: Remove redundant explicit UI Automation references
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $projectPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj'
-          $project = Get-Content $projectPath -Raw
-          $project = $project.Replace('<Version>1.0.6</Version>', '<Version>1.0.7</Version>')
-          if ($project -notmatch 'UIAutomationClient') {
-            $refs = "  <ItemGroup>`n    <Reference Include=`"UIAutomationClient`" />`n    <Reference Include=`"UIAutomationTypes`" />`n  </ItemGroup>`n"
-            $project = $project.Replace('</Project>', $refs + '</Project>')
-          }
-          if ($project -notmatch '<Version>1\.0\.7</Version>') { throw 'Profile version did not bump to 1.0.7' }
-          [System.IO.File]::WriteAllText((Resolve-Path $projectPath), $project)
+          $path = 'native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj'
+          $project = Get-Content $path -Raw
+          $pattern = '\s*<ItemGroup>\s*<Reference Include="UIAutomationClient"\s*/>\s*<Reference Include="UIAutomationTypes"\s*/>\s*</ItemGroup>\s*'
+          $updated = [regex]::Replace($project, $pattern, "`n")
+          if ($updated -eq $project) { throw 'Explicit UI Automation reference block was not found' }
+          if ($updated -notmatch '<Version>1\.0\.7</Version>') { throw 'Profile project is not v1.0.7' }
+          [System.IO.File]::WriteAllText((Resolve-Path $path), $updated)
 
-      - name: Commit v1.0.7 source changes
+      - name: Commit compiler fixes
         shell: pwsh
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- native-race-day-live/src/MXBRaceDayLive.Profile/BikeModelViewer.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
-          if (git diff --cached --quiet) { throw 'No v1.0.7 source changes were produced' }
-          git commit -m 'Route sealed bike previews through installed Frost renderer v1.0.7'
+          git add -- native-race-day-live/src/MXBRaceDayLive.Profile/FrostBikePreviewProvider.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          if (git diff --cached --quiet) { throw 'No v1.0.7 compiler fixes were produced' }
+          git commit -m 'Fix sealed bike renderer UI Automation references'
           git push origin HEAD:native-rebuild
