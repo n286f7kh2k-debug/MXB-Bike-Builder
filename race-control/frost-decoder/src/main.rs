@@ -34,7 +34,7 @@ struct DecodeOut {
 
 fn usage() -> ! {
     eprintln!(
-        "usage: mxb_asset_decoder <bike|rider|gear> <output.json.gz> <geom-or--> <setup-root-or--> <edf> [edf ...]"
+        "usage: mxb_asset_decoder <bike|rider|gear> <output.json.gz> <geom-or--> [setup-root] <edf> [edf ...]"
     );
     std::process::exit(2)
 }
@@ -48,7 +48,7 @@ fn main() {
 
 fn run() -> Result<(), String> {
     let args: Vec<String> = env::args().collect();
-    if args.len() < 6 {
+    if args.len() < 5 {
         usage();
     }
 
@@ -59,11 +59,31 @@ fn run() -> Result<(), String> {
 
     let output = &args[2];
     let geom = &args[3];
-    let setup_root = &args[4];
-    let sources = &args[5..];
+
+    // New calls may pass the setup root explicitly. Existing Race Day Live v1.0.4/1.0.5
+    // calls put the first EDF here; in that case the Process WorkingDirectory is already the
+    // bike root, so preserve compatibility and use it as the setup root automatically.
+    let explicit_root = args
+        .get(4)
+        .filter(|v| v.as_str() == "-" || Path::new(v.as_str()).is_dir());
+    let (setup_root, source_start) = if let Some(root) = explicit_root {
+        (root.clone(), 5usize)
+    } else {
+        (
+            env::current_dir()
+                .map_err(|e| format!("resolve bike working directory: {e}"))?
+                .to_string_lossy()
+                .into_owned(),
+            4usize,
+        )
+    };
+    if args.len() <= source_start {
+        usage();
+    }
+    let sources = &args[source_start..];
 
     let mut nodes = if mode == "bike" {
-        decode_bike(setup_root, sources)?
+        decode_bike(&setup_root, sources)?
     } else {
         decode_simple(&mode, sources)?
     };
@@ -72,8 +92,6 @@ fn run() -> Result<(), String> {
         return Err("no renderable EDF geometry was decoded".into());
     }
 
-    // Frost assembles bike parts in the game's authored frame, then converts the complete
-    // result to the right-handed Y-up frame used by its viewer.
     if mode == "bike" && geom != "-" && Path::new(geom).is_file() {
         let bytes = fs::read(geom).map_err(|e| format!("read {geom}: {e}"))?;
         let _ = edf::assemble_bike(&mut nodes, &bytes);
@@ -122,12 +140,34 @@ fn decode_simple(mode: &str, sources: &[String]) -> Result<Vec<edf::EdfNode>, St
     Ok(nodes)
 }
 
-/// Decode a bike the same way MX Bikes/Frost resolves it: gfx.cfg chooses each part's HRC,
-/// the HRC level0 block chooses the scene EDF and node name, and only those level0 nodes are
-/// rendered. This matters for OEM EDFs whose node names do not survive the generic heuristic.
+/// Decode a bike the way the game/Frost resolves it: use only the live model set at the bike
+/// root when one exists, follow gfx.cfg -> HRC -> level0 scene/node, then assemble by .geom.
 fn decode_bike(setup_root: &str, sources: &[String]) -> Result<Vec<edf::EdfNode>, String> {
+    let root = Path::new(setup_root);
+
+    // Race Day Live v1.0.5 recursively supplied parked FrostMod Models too. Frost does not:
+    // if the bike root contains a loose EDF, that is the active set and parked variants are
+    // ignored. Prefer EDFs whose immediate parent is the setup root whenever any exist.
+    let direct: Vec<&String> = if root.is_dir() {
+        sources
+            .iter()
+            .filter(|s| {
+                Path::new(s)
+                    .parent()
+                    .is_some_and(|parent| same_path(parent, root))
+            })
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let selected: Vec<&String> = if direct.is_empty() {
+        sources.iter().collect()
+    } else {
+        direct
+    };
+
     let mut edfs: HashMap<String, (PathBuf, Vec<u8>)> = HashMap::new();
-    for source in sources {
+    for source in selected {
         let path = PathBuf::from(source);
         let bytes = fs::read(&path).map_err(|e| format!("read {source}: {e}"))?;
         let name = path
@@ -145,49 +185,43 @@ fn decode_bike(setup_root: &str, sources: &[String]) -> Result<Vec<edf::EdfNode>
     let mut nodes = Vec::new();
     let mut resolved_scenes: Vec<(String, Vec<String>)> = Vec::new();
 
-    if setup_root != "-" {
-        let root = Path::new(setup_root);
-        if root.is_dir() {
-            let hrcs = read_hrcs(root);
-            if let Some(gfx_bytes) = read_named(root, "gfx.cfg") {
-                let gfx = cfg::parse_gfx(&gfx_bytes);
-                for part in cfg::GFX_PARTS {
-                    let Some(gp) = gfx.get(part) else { continue };
-                    let Some(hrc_file) = gp.hrc.as_deref() else { continue };
-                    let hrc_name = base_name(hrc_file);
-                    let Some(hrc_bytes) = hrcs.get(&hrc_name) else { continue };
-                    let parsed = cfg::parse(hrc_bytes);
-                    let stem = Path::new(&hrc_name)
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or(part);
-                    let Some(level0) = cfg::hrc_level0(&parsed, stem) else { continue };
-                    let scene = cfg::hrc_level0_scene(&parsed)
-                        .map(|s| base_name(&s))
-                        .unwrap_or_else(|| "model.edf".to_string());
-                    push_scene(&mut resolved_scenes, scene, level0);
-                }
+    if root.is_dir() {
+        let hrcs = read_hrcs(root);
+        if let Some(gfx_bytes) = read_named(root, "gfx.cfg") {
+            let gfx = cfg::parse_gfx(&gfx_bytes);
+            for part in cfg::GFX_PARTS {
+                let Some(gp) = gfx.get(part) else { continue };
+                let Some(hrc_file) = gp.hrc.as_deref() else { continue };
+                let hrc_name = base_name(hrc_file);
+                let Some(hrc_bytes) = hrcs.get(&hrc_name) else { continue };
+                let parsed = cfg::parse(hrc_bytes);
+                let stem = Path::new(&hrc_name)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or(part);
+                let Some(level0) = cfg::hrc_level0(&parsed, stem) else { continue };
+                let scene = cfg::hrc_level0_scene(&parsed)
+                    .map(|s| base_name(&s))
+                    .unwrap_or_else(|| "model.edf".to_string());
+                push_scene(&mut resolved_scenes, scene, level0);
             }
+        }
 
-            // Some mods have valid HRCs but an unusual/incomplete gfx.cfg. Frost's HRC chain is
-            // still authoritative, so use every root HRC as a safe second path when gfx resolved
-            // nothing rather than falling back to a filename guess immediately.
-            if resolved_scenes.is_empty() {
-                let mut names: Vec<_> = hrcs.keys().cloned().collect();
-                names.sort();
-                for hrc_name in names {
-                    let Some(hrc_bytes) = hrcs.get(&hrc_name) else { continue };
-                    let parsed = cfg::parse(hrc_bytes);
-                    let stem = Path::new(&hrc_name)
-                        .file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("model");
-                    let Some(level0) = cfg::hrc_level0(&parsed, stem) else { continue };
-                    let scene = cfg::hrc_level0_scene(&parsed)
-                        .map(|s| base_name(&s))
-                        .unwrap_or_else(|| "model.edf".to_string());
-                    push_scene(&mut resolved_scenes, scene, level0);
-                }
+        if resolved_scenes.is_empty() {
+            let mut names: Vec<_> = hrcs.keys().cloned().collect();
+            names.sort();
+            for hrc_name in names {
+                let Some(hrc_bytes) = hrcs.get(&hrc_name) else { continue };
+                let parsed = cfg::parse(hrc_bytes);
+                let stem = Path::new(&hrc_name)
+                    .file_stem()
+                    .and_then(|s| s.to_str())
+                    .unwrap_or("model");
+                let Some(level0) = cfg::hrc_level0(&parsed, stem) else { continue };
+                let scene = cfg::hrc_level0_scene(&parsed)
+                    .map(|s| base_name(&s))
+                    .unwrap_or_else(|| "model.edf".to_string());
+                push_scene(&mut resolved_scenes, scene, level0);
             }
         }
     }
@@ -198,7 +232,7 @@ fn decode_bike(setup_root: &str, sources: &[String]) -> Result<Vec<edf::EdfNode>
         nodes.append(&mut parsed);
     }
 
-    // Exact Frost fallback: model.edf by convention, else the shortest non-shadow EDF.
+    // Exact Frost fallback: model.edf by convention, otherwise shortest non-shadow EDF.
     if nodes.is_empty() {
         if let Some((_, bytes)) = base_edf(&edfs) {
             nodes = edf::parse(bytes);
@@ -234,6 +268,15 @@ fn decode_bike(setup_root: &str, sources: &[String]) -> Result<Vec<edf::EdfNode>
     }
 
     Ok(nodes)
+}
+
+fn same_path(a: &Path, b: &Path) -> bool {
+    match (fs::canonicalize(a), fs::canonicalize(b)) {
+        (Ok(a), Ok(b)) => a == b,
+        _ => a
+            .to_string_lossy()
+            .eq_ignore_ascii_case(&b.to_string_lossy()),
+    }
 }
 
 fn read_hrcs(root: &Path) -> HashMap<String, Vec<u8>> {
