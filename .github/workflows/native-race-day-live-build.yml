@@ -51,6 +51,27 @@ jobs:
       - name: Restore contracts
         run: dotnet restore native-race-day-live/src/MXBRaceDayLive.Contracts/MXBRaceDayLive.Contracts.csproj
 
+      - name: Sync feature runtime version from project
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $projectPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj'
+          [xml]$project = Get-Content $projectPath -Raw
+          $node = $project.SelectSingleNode('/Project/PropertyGroup/Version')
+          if ($null -eq $node -or [string]::IsNullOrWhiteSpace($node.InnerText)) { throw 'Profile project Version is missing' }
+          $version = $node.InnerText.Trim()
+          $parts = $version.Split('.')
+          if ($parts.Count -lt 3) { throw "Profile project Version must have major.minor.patch: $version" }
+
+          $sourcePath = 'native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs'
+          $source = Get-Content $sourcePath -Raw
+          $pattern = 'public\s+Version\s+Version\s*=>\s*new\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)\s*;'
+          $replacement = "public Version Version => new($($parts[0]), $($parts[1]), $($parts[2]));"
+          $updated = [regex]::Replace($source, $pattern, $replacement, 1)
+          if ($updated -eq $source) { throw 'Could not sync ProfileHomeFeature runtime version' }
+          [System.IO.File]::WriteAllText((Resolve-Path $sourcePath), $updated)
+          Write-Host "Profile runtime version synchronized to $version"
+
       - name: Build hot-swappable profile module
         shell: pwsh
         run: |
@@ -104,11 +125,11 @@ jobs:
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
         shell: pwsh
         run: |
-          $sourcePath = 'native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs'
-          $source = Get-Content $sourcePath -Raw
-          $match = [regex]::Match($source, 'public\s+Version\s+Version\s*=>\s*new\((\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*\)')
-          if (!$match.Success) { throw 'Could not determine profile module version from ProfileHomeFeature.cs' }
-          $version = "$($match.Groups[1].Value).$($match.Groups[2].Value).$($match.Groups[3].Value)"
+          $projectPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj'
+          [xml]$project = Get-Content $projectPath -Raw
+          $node = $project.SelectSingleNode('/Project/PropertyGroup/Version')
+          if ($null -eq $node -or [string]::IsNullOrWhiteSpace($node.InnerText)) { throw 'Profile project Version is missing' }
+          $version = $node.InnerText.Trim()
 
           $builtModule = 'native-out/profile-build/MXBRaceDayLive.Profile.dll'
           $publishDir = "native-race-day-live/updates/modules/$version"
