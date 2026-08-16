@@ -27,6 +27,8 @@ The Garage reads installed MX Bikes bike IDs and loadout state without launching
 
 The public iNsane viewer package is obtained from its publisher endpoint by Race Day Live on demand and cached inside the app's own component directory. Users are not asked to separately install Frost or iNsane's viewer. If the publisher endpoint blocks automated package retrieval, the Garage reports that component-download problem instead of falling back to the sealed EDF parser.
 
+The iNsane component's required .NET 6 Desktop Runtime is also provisioned privately under Race Day Live's LocalAppData component folder. Runtime provisioning is deliberately lazy: it happens only when a sealed-bike preview is opened, never during hot-module activation, so viewer setup cannot break the in-app update transaction.
+
 ## Update architecture
 
 The native shell is intentionally small and stable. Normal releases update feature modules and assets instead of replacing the running executable. A module update is downloaded to a staging directory, SHA-256 verified, loaded next to the current module, and rendered in the existing content region. Only after successful activation is the new module persisted as the startup version. The main window remains open throughout the update; a failed module leaves the existing feature running.
