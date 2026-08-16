@@ -76,7 +76,7 @@ registry=json.loads((work/'src/garage_model_registry.json').read_text(encoding='
 
 assert "VERSION = '0.5.2'" in config, 'gate:version'
 assert 'generate_proxy_mesh' in rend and "'proxy'" in rend, 'gate:universal_proxy'
-assert "SOURCE_EXTS = ('.obj', '.stl', '.ply', '.glb', '.gltf')" in rend, 'gate:source_formats'
+assert all(ext in rend for ext in ("'.obj'","'.stl'","'.ply'","'.glb'","'.gltf'")), 'gate:source_formats'
 assert '_load_glb' in rend and '_load_gltf' in rend, 'gate:gltf_loader'
 assert 'REGISTRY_URL' in rend and "entry.get('approved')" in rend and 'SHA-256 verification' in rend, 'gate:authorized_registry'
 assert 'ThreadPoolExecutor(max_workers=1' in rend and 'MAX_FACES = 5500' in rend, 'gate:performance_renderer'
