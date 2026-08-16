@@ -15,44 +15,24 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Prepare branded launcher icon
+      - name: Compile native branded launcher
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path race-control/staging | Out-Null
-          $icon = 'race-control/launcher/mxb_race_day_live.ico'
-          if (-not (Test-Path $icon)) { throw 'MXB Race Day Live launcher icon asset missing' }
-          Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
-          if (-not (Test-Path 'race-control/staging/rdl-launcher.ico')) { throw 'launcher icon staging failed' }
-
-      - name: Build branded launcher with PyInstaller
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          python -m pip install --disable-pip-version-check pyinstaller
-          $launcher = 'race-control/launcher/rdl_launcher.py'
-          $version = 'race-control/launcher/version_info.txt'
-          $icon = 'race-control/launcher/mxb_race_day_live.ico'
-          foreach ($p in @($launcher,$version,$icon)) { if (-not (Test-Path $p)) { throw "missing launcher input: $p" } }
-          python -m PyInstaller `
-            --noconfirm `
-            --clean `
-            --onefile `
-            --windowed `
-            --name 'MXB Race Day Live' `
-            --icon $icon `
-            --version-file $version `
-            --distpath race-control/staging `
-            --workpath race-control/staging/pyi-work `
-            --specpath race-control/staging/pyi-spec `
-            $launcher
+          $source = 'race-control/launcher/MXBRaceDayLiveLauncher.cs'
           $out = 'race-control/staging/MXB Race Day Live.exe'
-          if (-not (Test-Path $out)) { throw 'branded launcher output missing' }
+          if (-not (Test-Path $source)) { throw 'launcher source missing' }
+          $candidates = @(
+            "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+            "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+          )
+          $csc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $csc) { throw 'C# compiler not found on Windows runner' }
+          Write-Host "Compiler: $csc"
+          & $csc /nologo /target:winexe /optimize+ /platform:anycpu "/out:$out" $source
+          if ($LASTEXITCODE -ne 0) { throw "csc failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path $out)) { throw 'native branded launcher output missing' }
 
       - name: Validate branded launcher identity
         shell: pwsh
@@ -62,8 +42,8 @@ jobs:
           $vi = (Get-Item $out).VersionInfo
           Write-Host "ProductName=$($vi.ProductName) FileDescription=$($vi.FileDescription) FileVersion=$($vi.FileVersion)"
           if ($vi.ProductName -ne 'MXB Race Day Live') { throw "launcher ProductName incorrect: '$($vi.ProductName)'" }
-          if ($vi.OriginalFilename -ne 'MXB Race Day Live.exe') { throw "launcher OriginalFilename incorrect: '$($vi.OriginalFilename)'" }
-          if ($vi.FileDescription -ne 'MXB Race Day Live') { throw "launcher FileDescription incorrect: '$($vi.FileDescription)'" }
+          if ($vi.FileDescription -notlike 'MXB Race Day Live*') { throw "launcher FileDescription incorrect: '$($vi.FileDescription)'" }
+          if ($vi.FileVersion -ne '0.5.11.0') { throw "launcher FileVersion incorrect: '$($vi.FileVersion)'" }
 
       - name: Fetch pinned Frost EDF parser
         shell: pwsh
@@ -84,6 +64,14 @@ jobs:
           cargo build --manifest-path race-control/frost-decoder/Cargo.toml --release
           Copy-Item race-control/frost-decoder/target/release/mxb_asset_decoder.exe race-control/staging/mxb_asset_decoder.exe -Force
           if (-not (Test-Path race-control/staging/mxb_asset_decoder.exe)) { throw 'decoder executable missing' }
+
+      - name: Stage permanent shortcut icon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $icon = 'race-control/launcher/mxb_race_day_live.ico'
+          if (-not (Test-Path $icon)) { throw 'MXB Race Day Live icon asset missing' }
+          Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
 
       - name: Upload MXB release binaries
         uses: actions/upload-artifact@v4
