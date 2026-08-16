@@ -20,30 +20,39 @@ jobs:
         with:
           python-version: '3.12'
 
-      - name: Build branded in-process host
+      - name: Build branded launcher and recovery tool
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $launcher = 'race-control/launcher/rdl_launcher.py'
+          $recovery = 'race-control/recovery/rdl_recovery.py'
           $version = 'race-control/launcher/version_info.txt'
           $icon = 'race-control/launcher/mxb_race_day_live.ico'
-          foreach ($p in @($launcher,$version,$icon)) {
-            if (-not (Test-Path $p)) { throw "missing launcher input: $p" }
+          foreach ($p in @($launcher,$recovery,$version,$icon)) {
+            if (-not (Test-Path $p)) { throw "missing build input: $p" }
           }
           New-Item -ItemType Directory -Force -Path race-control/staging | Out-Null
           python -m pip install --disable-pip-version-check pyinstaller pillow
           Remove-Item 'race-control/staging/MXB Race Day Live.exe' -Force -ErrorAction SilentlyContinue
+          Remove-Item 'race-control/staging/MXB Race Day Live Recovery.exe' -Force -ErrorAction SilentlyContinue
           python -m PyInstaller --noconfirm --clean --onefile --windowed `
             --name 'MXB Race Day Live' `
             --version-file $version `
             --icon $icon `
             --distpath race-control/staging `
             $launcher
-          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
-          if (-not (Test-Path 'race-control/staging/MXB Race Day Live.exe')) { throw 'branded host output missing' }
+          if ($LASTEXITCODE -ne 0) { throw "launcher PyInstaller failed with exit code $LASTEXITCODE" }
+          python -m PyInstaller --noconfirm --clean --onefile --windowed `
+            --name 'MXB Race Day Live Recovery' `
+            --icon $icon `
+            --distpath race-control/staging `
+            $recovery
+          if ($LASTEXITCODE -ne 0) { throw "recovery PyInstaller failed with exit code $LASTEXITCODE" }
+          if (-not (Test-Path 'race-control/staging/MXB Race Day Live.exe')) { throw 'branded launcher output missing' }
+          if (-not (Test-Path 'race-control/staging/MXB Race Day Live Recovery.exe')) { throw 'recovery executable output missing' }
           Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
 
-      - name: Validate branded host identity
+      - name: Validate recovery binaries
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -53,8 +62,10 @@ jobs:
           if ($vi.ProductName -ne 'MXB Race Day Live') { throw "ProductName incorrect: '$($vi.ProductName)'" }
           if ($vi.OriginalFilename -ne 'MXB Race Day Live.exe') { throw "OriginalFilename incorrect: '$($vi.OriginalFilename)'" }
           if ($vi.FileDescription -ne 'MXB Race Day Live') { throw "FileDescription incorrect: '$($vi.FileDescription)'" }
-          $bytes = [System.IO.File]::ReadAllBytes($out)
-          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw 'branded host is not a Windows PE executable' }
+          foreach ($p in @($out,'race-control/staging/MXB Race Day Live Recovery.exe')) {
+            $bytes = [System.IO.File]::ReadAllBytes($p)
+            if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw "$p is not a Windows PE executable" }
+          }
 
       - name: Fetch pinned Frost EDF parser
         shell: pwsh
@@ -81,6 +92,7 @@ jobs:
           path: |
             race-control/staging/mxb_asset_decoder.exe
             race-control/staging/MXB Race Day Live.exe
+            race-control/staging/MXB Race Day Live Recovery.exe
             race-control/staging/rdl-launcher.ico
           if-no-files-found: error
 
@@ -101,7 +113,7 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import base64, hashlib, json, subprocess, sys
+          import base64, hashlib, json, shutil, subprocess, sys
           from pathlib import Path
           req = json.loads(Path('race-control/release-request.json').read_text(encoding='utf-8'))
           builder = str(req.get('builder_script') or '').strip()
@@ -125,6 +137,13 @@ jobs:
                   'sha256': digest,
                   'notes': str(req.get('notes', '')).strip(),
               }, indent=2) + '\n', encoding='utf-8')
+          version = str(req['version']).strip()
+          recovery_src = Path('race-control/staging/MXB Race Day Live Recovery.exe')
+          if recovery_src.is_file():
+              recovery_out = Path('race-control/releases') / f"MXB_Race_Day_Live_v{version.replace('.', '_')}_RECOVERY.exe"
+              recovery_out.parent.mkdir(parents=True, exist_ok=True)
+              shutil.copy2(recovery_src, recovery_out)
+              print('RECOVERY', recovery_out)
           PY
 
       - name: Publish release through GitHub API
@@ -143,7 +162,8 @@ jobs:
           filename = str(request.get('filename') or f"MXB_Race_Control_v{version.replace('.', '_')}_UPDATE.zip")
           release_path = f'race-control/releases/{filename}'
           manifest_path = 'race-control/latest.json'
-          release, manifest = Path(release_path), Path(manifest_path)
+          recovery_path = f"race-control/releases/MXB_Race_Day_Live_v{version.replace('.', '_')}_RECOVERY.exe"
+          release, manifest, recovery = Path(release_path), Path(manifest_path), Path(recovery_path)
           if not release.is_file() or not manifest.is_file():
               raise SystemExit(f'assembled release files are missing for v{version}: {release_path}')
           headers = {
@@ -163,6 +183,8 @@ jobs:
               {'path': release_path, 'mode': '100644', 'type': 'blob', 'sha': call('POST','/git/blobs',{'content':base64.b64encode(release.read_bytes()).decode('ascii'),'encoding':'base64'})['sha']},
               {'path': manifest_path, 'mode': '100644', 'type': 'blob', 'sha': call('POST','/git/blobs',{'content':manifest.read_text(encoding='utf-8'),'encoding':'utf-8'})['sha']},
           ]
+          if recovery.is_file():
+              entries.append({'path': recovery_path, 'mode': '100644', 'type': 'blob', 'sha': call('POST','/git/blobs',{'content':base64.b64encode(recovery.read_bytes()).decode('ascii'),'encoding':'base64'})['sha']})
           for attempt in range(1, 6):
               try:
                   head = call('GET','/git/ref/heads/main')['object']['sha']
