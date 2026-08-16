@@ -1,7 +1,7 @@
 {
-  "version": "0.5.3",
-  "filename": "MXB_Race_Day_Live_v0_5_3_UPDATE.zip",
-  "notes": "Inspection only for v0.5.3 runtime integration and updater architecture.",
-  "builder_script": "race-control/inspect_v053_extension_runtime.py",
-  "inspection_attempt": 1
+  "version": "0.5.4",
+  "filename": "MXB_Race_Day_Live_v0_5_4_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.4: deep MX Bikes extension integration plus stay-open hot updating. Race Day Live now watches the native game profile/content roots, mirrors bike/paint/kit changes, captures full race loadouts, reapplies the saved native loadout before one-click direct-connect, and replaces the fake Garage bike flow with an MX Bikes-style Bike Selection mirror that writes directly to profile.ini. This version also installs the new hot updater so updates after v0.5.4 install and refresh inside the existing window without closing/restarting.",
+  "builder_script": "race-control/build_v054_extension_hotupdate.py",
+  "build_attempt": 1
 }
