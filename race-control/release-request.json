@@ -1,7 +1,6 @@
 {
-  "version": "0.3.1",
-  "filename": "MXB_Race_Day_Live_v0_3_1_UPDATE.zip",
-  "notes": "Inspection pass only; no release publication.",
-  "builder_script": "race-control/inspect_v031_signup.py",
-  "inspect_attempt": 4
+  "version": "0.3.2",
+  "filename": "MXB_Race_Day_Live_v0_3_2_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.3.2: adds automated rider memberships with Pit Pass, Race Pass and Factory Pass tiers, daily discounted Community-race allowances, automatic member wallet rebates, subscription status/usage tracking, and provider-ready recurring billing fields. Cash/Premier pricing, the $3 Community purse/fast-lap economics, verified MX Bikes Shop artwork, in-app updates and automatic restart are preserved.",
+  "builder_script": "race-control/build_v032_subscriptions.py"
 }
