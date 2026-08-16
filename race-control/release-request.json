@@ -1,7 +1,7 @@
 {
-  "version": "0.5.13",
-  "filename": "MXB_Race_Day_Live_v0_5_13_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.13 refines the profile-first interface into a focused dark race-night layout based on the supplied visual direction without copying it or adding unnecessary dashboard clutter. The rider profile stays the landing page with banner/avatar identity, a compact career strip, My Races, next-race and latest-result panels. Primary navigation is limited to Profile, Find a Race, Championships, Garage, Live and Results; Wallet, Rankings, Profile Settings, Membership, MX Bikes tools, updates and Admin are moved into a compact MENU dropdown. Windows identity is reworked at the process level: MXB Race Day Live.exe hosts the app in-process instead of handing the window to pythonw.exe, the custom icon is embedded directly into the executable, desktop and existing pinned links target that executable and its embedded icon, and the previous explicit Python-era AppUserModelID override is removed. Installation performs a one-time automatic relaunch into the new branded host.",
-  "builder_script": "race-control/build_v0513_race_theme_native_host_v2.py",
-  "build_attempt": 2
+  "version": "0.5.14",
+  "filename": "MXB_Race_Day_Live_v0_5_14_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.14 is an emergency startup recovery release for the v0.5.13 host regression. It preserves the v0.5.13 profile-first race-night UI and all app data/features, restores the last known-good external pythonw launch model, strips inherited PyInstaller parent-process state before launching the runtime, removes the frozen-host Tkinter failure path, and restores the earlier stable shell/AppUserModelID handling. Garage/model fixes are intentionally paused until startup is stable again.",
+  "builder_script": "race-control/build_v0514_startup_recovery.py",
+  "build_attempt": 1
 }
