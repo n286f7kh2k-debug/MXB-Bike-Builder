@@ -1,6 +1,6 @@
 {
-  "version": "0.3.8",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_8_UPDATE.zip",
-  "sha256": "1098146b4f50c406c07c99c747857983357dc54b4004689cb25b98544e3a07a5",
-  "notes": "MXB Race Day Live v0.3.8: fixes the Windows taskbar icon by taking the exact icon Windows already displays for the MXB Race Day Live desktop shortcut and applying it directly to the live app HWND. A fresh AppUserModelID bypasses stale Python/Tk shell caching; WM_SETICON sets both large and small taskbar icons, the top-level class icons are updated, and the icon is re-applied after window mapping so Tk/Windows cannot replace it during startup. If the shortcut cannot be found, Race Day Live falls back to any local packaged ICO it can locate. Existing Garage, performance optimizations, updater/restart, one-click joining, memberships, wallet, race economics, track artwork, results and admin controls are preserved."
+  "version": "0.3.9",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_9_UPDATE.zip",
+  "sha256": "4f4243fea7d75ddcaa294a65a2796bdf0a75ec59a407900db7875cfd89cb9d19",
+  "notes": "MXB Race Day Live v0.3.9: Garage no longer launches MX Bikes, Steam, testing mode, or any external game window. The Garage 3D viewport is now an actual in-app renderer for readable source geometry while all installed bikes, paints and gear remain selectable/synced to the native MX Bikes profile. Compiled EDF-only geometry is treated as opaque instead of launching/crashing MX Bikes. Windows desktop/taskbar identity is also rebuilt around the desktop shortcut actual IconLocation so the live taskbar uses the same logo source. Existing updater/restart, race joining, memberships, economics, track art and performance caches are preserved."
 }
