@@ -1,0 +1,29 @@
+name: Apply v1.0.13 Race Night Theme
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/run-v1013-race-night-theme.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+      - name: Apply race-night theme
+        shell: pwsh
+        run: python .github/scripts/patch_v1013_race_night_theme.py
+      - name: Commit theme pass
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
+          git commit -m "Restyle existing app with race-night game theme"
+          git push origin native-rebuild
