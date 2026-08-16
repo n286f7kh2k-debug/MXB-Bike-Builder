@@ -37,7 +37,7 @@ internal static class BikeModelViewer
         var decoded = await DecodeAsync(decoder, bundle, cancellationToken);
         var viewport = BuildViewport(decoded);
         var modelDescription = string.Join(", ", bundle.EdfFiles.Select(Path.GetFileName));
-        return new BikeModelPreviewResult(viewport, bike.Path, modelDescription);
+        return new BikeModelPreviewResult(viewport, bundle.SourcePath, modelDescription);
     }
 
     private static BikeBundle ResolveBundle(MXContentItem bike)
@@ -46,35 +46,103 @@ internal static class BikeModelViewer
             throw new InvalidOperationException("This MX Bikes bike has no source path attached to it.");
 
         var source = bike.Path;
-        string root;
+        var roots = new List<string>();
+        var sourceParts = new List<string>();
+        var packageWasLocked = false;
+
+        static void AddRoot(List<string> list, string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || !Directory.Exists(path)) return;
+            if (!list.Contains(path, StringComparer.OrdinalIgnoreCase)) list.Add(path);
+        }
 
         if (Directory.Exists(source))
         {
-            root = source;
+            AddRoot(roots, source);
+            sourceParts.Add(source);
+
+            var siblingPkz = source.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar) + ".pkz";
+            if (File.Exists(siblingPkz))
+            {
+                sourceParts.Insert(0, siblingPkz);
+                try
+                {
+                    AddRoot(roots, ExtractReadablePkz(siblingPkz));
+                }
+                catch (InvalidOperationException)
+                {
+                    packageWasLocked = true;
+                }
+            }
         }
         else if (File.Exists(source) && string.Equals(Path.GetExtension(source), ".pkz", StringComparison.OrdinalIgnoreCase))
         {
-            root = ExtractReadablePkz(source);
+            sourceParts.Add(source);
+
+            var parent = Path.GetDirectoryName(source) ?? string.Empty;
+            var companion = Path.Combine(parent, Path.GetFileNameWithoutExtension(source));
+            if (Directory.Exists(companion))
+            {
+                AddRoot(roots, companion);
+                sourceParts.Add(companion);
+            }
+
+            try
+            {
+                AddRoot(roots, ExtractReadablePkz(source));
+            }
+            catch (InvalidOperationException)
+            {
+                packageWasLocked = true;
+            }
         }
         else if (File.Exists(source) && string.Equals(Path.GetExtension(source), ".edf", StringComparison.OrdinalIgnoreCase))
         {
-            root = Path.GetDirectoryName(source) ?? throw new InvalidOperationException("The EDF source folder could not be resolved.");
+            var parent = Path.GetDirectoryName(source)
+                ?? throw new InvalidOperationException("The EDF source folder could not be resolved.");
+            AddRoot(roots, parent);
+            sourceParts.Add(source);
         }
         else
         {
             throw new FileNotFoundException("The installed MX Bikes bike source no longer exists.", source);
         }
 
-        var edfs = VisibleEdfs(root);
+        var edfs = roots
+            .SelectMany(VisibleEdfs)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
         if (edfs.Count == 0)
+        {
+            if (packageWasLocked && roots.Count > 0)
+            {
+                throw new InvalidOperationException(
+                    "Race Day Live found both the creator-locked PKZ and its companion bike folder, but that folder does not contain a readable EDF model. " +
+                    "This bike needs the locked-PKZ reader path Frost uses rather than a ZIP extractor.");
+            }
+            if (packageWasLocked)
+            {
+                throw new InvalidOperationException(
+                    "Race Day Live found the creator-locked PKZ, but no same-named companion bike folder with readable EDF geometry was found. " +
+                    "This bike needs the locked-PKZ reader path Frost uses.");
+            }
             throw new InvalidOperationException("The linked bike source contains no readable MX Bikes EDF model geometry.");
+        }
 
-        var geom = Directory.EnumerateFiles(root, "*.geom", SearchOption.AllDirectories)
-            .OrderBy(x => x.Length)
-            .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
-            .FirstOrDefault();
+        string? geom = null;
+        foreach (var root in roots)
+        {
+            geom = Directory.EnumerateFiles(root, "*.geom", SearchOption.AllDirectories)
+                .OrderBy(x => Path.GetFileName(x).Length)
+                .ThenBy(x => x, StringComparer.OrdinalIgnoreCase)
+                .FirstOrDefault();
+            if (!string.IsNullOrWhiteSpace(geom)) break;
+        }
 
-        return new BikeBundle(source, root, edfs, geom);
+        var workingRoot = roots.FirstOrDefault() ?? Path.GetDirectoryName(edfs[0]) ?? string.Empty;
+        var sourceDescription = string.Join("  +  ", sourceParts.Distinct(StringComparer.OrdinalIgnoreCase));
+        return new BikeBundle(sourceDescription, workingRoot, edfs, geom);
     }
 
     private static List<string> VisibleEdfs(string root)
@@ -148,9 +216,7 @@ internal static class BikeModelViewer
         }
         catch (InvalidDataException)
         {
-            throw new InvalidOperationException(
-                "This bike is linked to the correct installed PKZ, but the package is creator-protected/non-ZIP. " +
-                "Race Day Live will not substitute a fake model or bypass the package protection.");
+            throw new InvalidOperationException("This MX Bikes PKZ is creator-protected/non-ZIP.");
         }
 
         return destination;
