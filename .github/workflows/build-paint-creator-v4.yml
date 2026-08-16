@@ -25,12 +25,14 @@ jobs:
 
           $p01 = (Raw 'ci-paint-v4-repair/p01_0.txt') + (Raw 'ci-paint-v4-repair/p01_1.txt') + (Raw 'ci-paint-v4-repair/p01_2.txt')
           $p06 = (Raw 'ci-paint-v4-repair/p06_0.txt') + (Raw 'ci-paint-v4-repair/p06_1.txt') + (Raw 'ci-paint-v4-repair/p06_2.txt')
+          $p09 = (Raw 'ci-paint-v4-repair/p09s_0.txt') + (Raw 'ci-paint-v4-repair/p09s_1.txt') + (Raw 'ci-paint-v4-repair/p09s_2.txt') + (Raw 'ci-paint-v4-repair/p09s_3.txt') + (Raw 'ci-paint-v4-repair/p09s_4.txt')
           $p10 = (Raw 'ci-paint-v4-repair/p10s_0.txt') + (Raw 'ci-paint-v4-repair/p10s_1.txt') + (Raw 'ci-paint-v4-repair/p10s_2.txt') + (Raw 'ci-paint-v4-repair/p10s_3.txt') + (Raw 'ci-paint-v4-repair/p10s_4.txt')
 
           $b64 = $p01
           foreach ($n in 2..5) { $b64 += Raw ("ci-paint-v4/part{0:D2}.txt" -f $n) }
           $b64 += $p06
-          foreach ($n in 7..9) { $b64 += Raw ("ci-paint-v4/part{0:D2}.txt" -f $n) }
+          foreach ($n in 7..8) { $b64 += Raw ("ci-paint-v4/part{0:D2}.txt" -f $n) }
+          $b64 += $p09
           $b64 += $p10
 
           $zip = Join-Path $env:RUNNER_TEMP 'paint-v4-source.zip'
