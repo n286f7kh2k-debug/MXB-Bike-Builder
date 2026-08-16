@@ -22,7 +22,6 @@ jobs:
           $ErrorActionPreference = 'Stop'
           function Raw([string]$p) { return ((Get-Content -Raw $p) -replace '\s','') }
 
-          # Verified v4 source base.
           $p01 = (Raw 'ci-paint-v4-repair/p01_0.txt') + (Raw 'ci-paint-v4-repair/p01_1.txt') + (Raw 'ci-paint-v4-repair/p01_2.txt')
           $p06 = (Raw 'ci-paint-v4-repair/p06_0.txt') + (Raw 'ci-paint-v4-repair/p06_1.txt') + (Raw 'ci-paint-v4-repair/p06_2.txt')
           $p09 = (Raw 'ci-paint-v4-repair/p09s_0.txt') + (Raw 'ci-paint-v4-repair/p09s_1.txt') + (Raw 'ci-paint-v4-repair/p09s_2.txt') + (Raw 'ci-paint-v4-repair/p09s_3.txt') + (Raw 'ci-paint-v4-repair/p09s_4.txt')
@@ -39,7 +38,6 @@ jobs:
           $src = Join-Path $env:RUNNER_TEMP 'paint-v6-source'
           Expand-Archive -Path $baseZip -DestinationPath $src -Force
 
-          # Verified v5 real-rider viewer patch.
           $v5Zip = Join-Path $env:RUNNER_TEMP 'paint-v5-patch.zip'
           $v5B64 = Raw 'ci-paint-v5/paint-v5-patch.zip.b64'
           [IO.File]::WriteAllBytes($v5Zip, [Convert]::FromBase64String($v5B64))
@@ -47,33 +45,25 @@ jobs:
           if ($v5Hash -ne '3147dc1188d40d0b722f8051fdd6237667bc6971d4c91bb93addcd6b1388a5db') { throw "V5 PATCH HASH MISMATCH: $v5Hash" }
           Expand-Archive -Path $v5Zip -DestinationPath $src -Force
 
-          # v6 shell/navigation/hot-update patch, split only for connector transport.
           $v6Zip = Join-Path $env:RUNNER_TEMP 'paint-v6-patch.zip'
           $v6B64 = (Raw 'ci-paint-v6/p00.b64') + (Raw 'ci-paint-v6/p01.b64')
           [IO.File]::WriteAllBytes($v6Zip, [Convert]::FromBase64String($v6B64))
           $v6Hash = (Get-FileHash $v6Zip -Algorithm SHA256).Hash.ToLowerInvariant()
-          Write-Host "V6 PATCH SHA256=$v6Hash"
+          if ($v6Hash -ne '8876dd13283a5824ba4d86d6ec0988170246d8fde424da033d886ffa8a8e5050') { throw "V6 PATCH HASH MISMATCH: $v6Hash" }
           Expand-Archive -Path $v6Zip -DestinationPath $src -Force
 
-          # WPF generated temporary projects do not reliably carry all implicit usings.
-          $imports = @{
-            'src\MXBRaceDayLive.PaintCreator\Services\RiderGearSetStore.cs' = @('using System.IO;')
-            'src\MXBRaceDayLive.PaintCreator\Monetization\ProjectFingerprintService.cs' = @('using System.IO;')
-            'src\MXBRaceDayLive.PaintCreator\Services\ObjUvMeshLoader.cs' = @('using System.IO;')
-            'src\MXBRaceDayLive.PaintCreator\Services\IGearPreviewModelService.cs' = @('using System.IO;')
-            'src\MXBRaceDayLive.PaintCreator\Services\OfficialMxBikesPreviewModelService.cs' = @('using System.IO;','using System.Net.Http;')
-            'src\MXBRaceDayLive.PaintCreator.Demo\PaintCreatorHotUpdateService.cs' = @('using System.IO;','using System.Net.Http;')
-            'src\MXBRaceDayLive.PaintCreator.Demo\PaintCreatorModuleLoadContext.cs' = @('using System.IO;')
-          }
-          foreach ($rel in $imports.Keys) {
-            $file = Join-Path $src $rel
-            if (!(Test-Path -LiteralPath $file)) { continue }
-            $text = Get-Content -Raw -LiteralPath $file
-            foreach ($import in $imports[$rel]) {
-              if ($text -notmatch [regex]::Escape($import)) { $text = $import + "`r`n" + $text }
-            }
-            Set-Content -LiteralPath $file -Value $text -Encoding utf8
-          }
+          # Build-only global usings avoid modifying recovered source files.
+          @'
+          global using System.IO;
+          global using System.Net.Http;
+          '@ | Set-Content -LiteralPath (Join-Path $src 'src\MXBRaceDayLive.PaintCreator\GlobalUsings.Build.cs') -Encoding utf8
+
+          @'
+          global using System.IO;
+          global using System.Net.Http;
+          global using System.Reflection;
+          global using System.Runtime.Loader;
+          '@ | Set-Content -LiteralPath (Join-Path $src 'src\MXBRaceDayLive.PaintCreator.Demo\GlobalUsings.Build.cs') -Encoding utf8
 
           "SRC=$src" >> $env:GITHUB_ENV
           "V6_HASH=$v6Hash" >> $env:GITHUB_ENV
@@ -83,41 +73,38 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $demo = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo'
-          $xaml = Get-Content -Raw -LiteralPath (Join-Path $demo 'MainWindow.xaml')
-          $code = Get-Content -Raw -LiteralPath (Join-Path $demo 'MainWindow.xaml.cs')
+          $xamlPath = Join-Path $demo 'MainWindow.xaml'
+          $codePath = Join-Path $demo 'MainWindow.xaml.cs'
           $updatePath = Join-Path $demo 'PaintCreatorHotUpdateService.cs'
           $loadPath = Join-Path $demo 'PaintCreatorModuleLoadContext.cs'
-          if (!(Test-Path $updatePath)) { throw 'PaintCreatorHotUpdateService.cs missing.' }
-          if (!(Test-Path $loadPath)) { throw 'PaintCreatorModuleLoadContext.cs missing.' }
+          foreach ($p in @($xamlPath,$codePath,$updatePath,$loadPath)) { if (!(Test-Path -LiteralPath $p)) { throw "Required v6 file missing: $p" } }
+          $xaml = Get-Content -Raw -LiteralPath $xamlPath
+          $code = Get-Content -Raw -LiteralPath $codePath
           $update = Get-Content -Raw -LiteralPath $updatePath
           $loader = Get-Content -Raw -LiteralPath $loadPath
 
-          if ($xaml -notmatch 'UPDATE') { throw 'In-app UPDATE button is missing from MainWindow.xaml.' }
-          if ($code -notmatch 'PaintCreatorHotUpdateService') { throw 'Main window is not wired to the hot update service.' }
-          if ($loader -notmatch 'AssemblyLoadContext') { throw 'Collectible module load context is missing.' }
-          if (($loader -notmatch 'isCollectible\s*:\s*true') -and ($loader -notmatch 'true\s*\)')) { throw 'Paint Creator module load context is not collectible.' }
-          if ($code -notmatch 'Unload') { throw 'No module unload path found in the host.' }
-          if ($code -notmatch 'Capture|State|Restore') { throw 'No editor-state preservation path found around hot reload.' }
+          if ($xaml -notmatch 'UPDATE') { throw 'In-app UPDATE button is missing.' }
+          if ($code -notmatch 'PaintCreatorHotUpdateService') { throw 'UPDATE is not wired to the hot update service.' }
+          if ($loader -notmatch 'AssemblyLoadContext') { throw 'Module load context is missing.' }
+          if (($loader -notmatch 'isCollectible\s*:\s*true') -and ($loader -notmatch 'base\s*\([^\)]*true')) { throw 'Module load context is not collectible.' }
+          if ($code -notmatch '\.Unload\s*\(') { throw 'Host has no module unload call.' }
+          if ($code -notmatch 'Capture|Save.*State|Restore|State') { throw 'No state preservation path was detected.' }
+          if ($update -notmatch 'sha256|SHA256|Hash') { throw 'Updater has no package verification path.' }
 
-          # The old fake Race Day Live sidebar must not remain in the standalone test shell.
           $deadLabels = @('HOME','PADDOCK','FIND A RACE','CHAMPIONSHIPS','RESULTS','WALLET','ADMIN')
           $found = @()
           foreach ($label in $deadLabels) { if ($xaml -match [regex]::Escape($label)) { $found += $label } }
           if ($found.Count -gt 2) { throw "Dead outer navigation still present: $($found -join ', ')" }
 
-          Write-Host '--- MainWindow XAML ---'
-          Write-Host $xaml
-          Write-Host '--- Hot update service ---'
-          Write-Host $update
-          Write-Host '--- Module load context ---'
-          Write-Host $loader
+          Write-Host "UI/HOT UPDATE CONTRACT PASS. Dead outer labels found: $($found.Count)"
+          Select-String -Path $xamlPath -Pattern 'UPDATE|JERSEY|HELMET|GLOVE|BOOT|DESIGN' -CaseSensitive:$false | ForEach-Object { Write-Host $_.Line.Trim() }
+          Select-String -Path $codePath -Pattern 'Update|Unload|State|Restore|Module' -CaseSensitive:$false | Select-Object -First 60 | ForEach-Object { Write-Host $_.Line.Trim() }
 
       - name: Build Paint Creator module
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $proj = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
-          dotnet build $proj -c Release
+          dotnet build (Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj') -c Release
 
       - name: Smoke test official MX Bikes rider UV viewer
         shell: pwsh
@@ -128,13 +115,7 @@ jobs:
           $lib = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
           @"
           <Project Sdk="Microsoft.NET.Sdk">
-            <PropertyGroup>
-              <OutputType>Exe</OutputType>
-              <TargetFramework>net8.0-windows</TargetFramework>
-              <UseWPF>true</UseWPF>
-              <ImplicitUsings>enable</ImplicitUsings>
-              <Nullable>enable</Nullable>
-            </PropertyGroup>
+            <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
             <ItemGroup><ProjectReference Include="$lib" /></ItemGroup>
           </Project>
           "@ | Set-Content -LiteralPath (Join-Path $smoke 'ModelSmoke.csproj')
@@ -177,13 +158,7 @@ jobs:
           if ($null -eq $exe) { $exe = $allExe[0] }
           (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content (Join-Path $env:OUT 'EXE.sha256')
           Copy-Item (Join-Path $env:RUNNER_TEMP 'model-smoke.log') (Join-Path $env:OUT 'MODEL_VIEWER_SMOKE_TEST.txt') -Force
-          @(
-            "Paint Creator v6",
-            "V6 patch SHA256: $env:V6_HASH",
-            'Architecture: standalone host + collectible Paint Creator module',
-            'Update behavior: host remains open while module is replaced/reloaded',
-            'Persistent user projects/assets remain outside replaceable module files'
-          ) | Set-Content (Join-Path $env:OUT 'V6_UPDATE_ARCHITECTURE.txt')
+          @("Paint Creator v6","V6 patch SHA256: $env:V6_HASH",'Host stays open while collectible Paint Creator module is unloaded/reloaded.','Projects/assets remain outside replaceable module files.') | Set-Content (Join-Path $env:OUT 'V6_UPDATE_ARCHITECTURE.txt')
           Get-ChildItem -LiteralPath $env:OUT | Select-Object Name,Length | Format-Table -AutoSize | Out-File (Join-Path $env:OUT 'BUILD_MANIFEST.txt')
 
       - name: Upload v6 test app
