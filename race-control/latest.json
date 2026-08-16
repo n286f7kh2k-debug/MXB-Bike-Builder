@@ -1,6 +1,6 @@
 {
-  "version": "0.3.4",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_4_UPDATE.zip",
-  "sha256": "4b8c1efa5104eba2b3922d6d823bb52d975c41ec4d9581388d92f465c77da8e9",
-  "notes": "MXB Race Day Live v0.3.4: adds a native Profile > Bikes garage modeled on the MX Bikes Bike Selection screen. It reads the rider\u2019s actual MX Bikes profile and mod folders, cycles the same Bike/Head/Torso/Legs selections, writes the native profile.ini selection fields with a safety backup, uses synced/custom bikes and .pnt gear paints, and keeps race-bike selection aligned. Also assigns a stable Windows AppUserModelID and the Race Day Live icon to the window/taskbar. v0.3.3 one-click game/server launch and all existing updater, membership, wallet, race economics, track media, live timing, results and admin controls are preserved."
+  "version": "0.3.5",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_5_UPDATE.zip",
+  "sha256": "141fdb83b535f188d2af2353009013bc2c64bca588ccd786831b31b8578eba0e",
+  "notes": "MXB Race Day Live v0.3.5: adds Live 3D to Profile > Bikes using the actual MX Bikes rendering engine. Race Day Live generates a PiBoSo testing-mode config from the current garage selection, launches a dedicated windowed mxbikes.exe preview instance, and embeds that real render window inside the app with Win32 window hosting. Bike/paint/rider/helmet/boots/gloves selection changes can refresh the native preview. The user\u2019s mxbikes.ini is backed up before temporary preview resolution/window-mode changes and restored when the preview closes. v0.3.4 native profile selection and taskbar icon, v0.3.3 one-click race joining, updater/restart, memberships, wallet, race economics, track media, live timing, results and admin controls are preserved."
 }
