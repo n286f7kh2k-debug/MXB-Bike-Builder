@@ -1,7 +1,6 @@
 {
-  "version": "0.3.8",
-  "filename": "MXB_Race_Day_Live_v0_3_8_UPDATE.zip",
-  "notes": "Garage method inspection only; no release publication intended.",
-  "builder_script": "race-control/inspect_v038_garage_method.py",
-  "inspection": "garage_method"
+  "version": "0.3.9",
+  "filename": "MXB_Race_Day_Live_v0_3_9_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.3.9: removes all MX Bikes/Steam launching from Garage, replaces the broken embedded-game renderer with a true in-app 3D canvas for readable source geometry while keeping native profile/bike/paint/gear sync, and rebuilds Windows shortcut/taskbar identity around the shortcut's actual IconLocation. Existing updater/restart, race joining, memberships, economics, track media and performance optimizations are preserved.",
+  "builder_script": "race-control/build_v039_no_game_garage_icon.py"
 }
