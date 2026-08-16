@@ -1,0 +1,40 @@
+name: Fix v1.0.8 iNsane provider
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/fix-v108-insane-provider.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+          fetch-depth: 0
+
+      - name: Fix invalid null-return expression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $path = 'native-race-day-live/src/MXBRaceDayLive.Profile/InsaneBikePreviewProvider.cs'
+          $text = Get-Content $path -Raw
+          $old = '            var root = AutomationElement.FromHandle(hwnd) ?? return;'
+          $new = "            var root = AutomationElement.FromHandle(hwnd);`n            if (root is null) return;"
+          if (-not $text.Contains($old)) { throw 'Expected compile-error line was not found' }
+          $text = $text.Replace($old, $new)
+          [System.IO.File]::WriteAllText((Resolve-Path $path), $text)
+
+      - name: Commit fix
+        shell: pwsh
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- native-race-day-live/src/MXBRaceDayLive.Profile/InsaneBikePreviewProvider.cs
+          git commit -m 'Fix internal iNsane viewer automation compile error'
+          git push origin HEAD:native-rebuild
