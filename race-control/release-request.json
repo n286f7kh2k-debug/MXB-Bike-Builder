@@ -1,7 +1,7 @@
 {
-  "version": "0.5.9",
-  "filename": "MXB_Race_Day_Live_v0_5_9_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.9 replaces the failed template/generic Garage viewer with a real MX Bikes asset pipeline adapted from Frost/mxb-app under its MIT license. A native Windows decoder compiled from Frost's pinned public EDF parser reads actual MX Bikes EDF geometry; Race Day Live reads real PNT paint sheets and EDF embedded textures, resolves the selected rider.edf and selected helmet/boots/protection EDFs, and uses .geom bike assembly without launching MX Bikes. The old generic/template rider viewer is removed. Creator-locked non-ZIP PKZs fail closed rather than being cracked or replaced with fake geometry. Bike/Helmet/Gear/Boots/Goggles/Gloves/Protection dropdowns, native profile sync, OEM category linking, the working taskbar icon, performance caches and stay-open hot updates are preserved.",
-  "builder_script": "race-control/build_v059_frost_native_edf_v2.py",
-  "build_attempt": 2
+  "version": "0.5.10",
+  "filename": "MXB_Race_Day_Live_v0_5_10_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.10 corrects the Frost-native Garage bridge before user testing: plain PKZ extraction now keeps root-level model.edf/model.geom and arbitrary split-part EDF names instead of requiring internal filenames to repeat the bike ID, and native-fit protection keeps its authored origin instead of being recentered. The real Frost-based EDF/PNT pipeline, selected rider.edf and selected helmet/boots/protection EDFs, .geom bike assembly, seven Garage dropdown tabs, native MX Bikes profile sync, background performance path, stay-open hot updates and the working taskbar icon are preserved. No generic bike/rider stand-in and no MX Bikes process is used by Garage; locked/non-ZIP PKZs fail closed rather than showing fake geometry.",
+  "builder_script": "race-control/build_v0510_frost_resolution_fix.py",
+  "build_attempt": 1
 }
