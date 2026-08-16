@@ -8,9 +8,9 @@
     <AssemblyName>MXB Race Day Live</AssemblyName>
     <RootNamespace>MXBRaceDayLive.Shell</RootNamespace>
     <ApplicationIcon>../../../race-control/launcher/mxb_race_day_live.ico</ApplicationIcon>
-    <Version>1.0.0</Version>
-    <FileVersion>1.0.0.0</FileVersion>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <Version>1.0.1</Version>
+    <FileVersion>1.0.1.0</FileVersion>
+    <AssemblyVersion>1.0.1.0</AssemblyVersion>
     <Company>MXB Race Day Live</Company>
     <Product>MXB Race Day Live</Product>
     <Description>MXB Race Day Live</Description>
