@@ -1,0 +1,16 @@
+<Application x:Class="MXBRaceDayLive.Shell.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+    <Application.Resources>
+        <SolidColorBrush x:Key="BgBrush" Color="#04101B"/>
+        <SolidColorBrush x:Key="PanelBrush" Color="#071A29"/>
+        <SolidColorBrush x:Key="Panel2Brush" Color="#0A2235"/>
+        <SolidColorBrush x:Key="AccentBrush" Color="#079CFF"/>
+        <SolidColorBrush x:Key="LineBrush" Color="#155273"/>
+        <SolidColorBrush x:Key="TextBrush" Color="#F2F7FB"/>
+        <SolidColorBrush x:Key="MutedBrush" Color="#88A5BA"/>
+        <SolidColorBrush x:Key="GoldBrush" Color="#F4C542"/>
+        <SolidColorBrush x:Key="GreenBrush" Color="#2BD672"/>
+    </Application.Resources>
+</Application>
