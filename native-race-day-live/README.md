@@ -23,7 +23,7 @@ The Windows build publishes a self-contained `MXB Race Day Live.exe` and a separ
 
 ## Garage / 3D preview
 
-The Garage reads installed MX Bikes bike IDs and loadout state without launching MX Bikes. Plain readable EDF geometry uses the native Race Day Live viewer. Creator-sealed EDF geometry is routed through an external authorized preview provider instead of being mis-parsed or replaced with a fake model. The first sealed-bike provider can attach to the user's installed MXB App/Frost renderer, drive its normal Studio controls to the clicked bike ID, and host the working renderer inside the Race Day Live Garage while MX Bikes remains closed.
+The Garage reads installed MX Bikes bike IDs and loadout state without launching MX Bikes. Plain readable EDF geometry uses the native Race Day Live viewer. Creator-sealed EDF geometry is routed through an external authorized preview provider instead of being mis-parsed or replaced with a fake model. The first sealed-bike provider can attach to the user's installed MXB App/Frost renderer, drive its normal Studio controls to the clicked bike ID, and host the working renderer inside the Race Day Live Garage while MX Bikes remains closed. The bridge uses the Windows UI Automation support already provided by the WPF Windows desktop runtime, so no separate automation runtime is installed.
 
 ## Update architecture
 
