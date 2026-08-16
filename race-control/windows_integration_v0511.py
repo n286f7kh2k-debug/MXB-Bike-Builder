@@ -164,7 +164,8 @@ def best_icon(root,refresh=False):
 def _write_shortcut(shortcut,root,launcher,icon=''):
     shortcut=Path(shortcut);root=Path(root).resolve();launcher=Path(launcher)
     shortcut.parent.mkdir(parents=True,exist_ok=True)
-    args=f'"{root / "app.py"}"'
+    # The branded launcher resolves app.py itself. Supplying app.py here would duplicate it.
+    args=''
     ps=("$w=New-Object -ComObject WScript.Shell;"
         "$s=$w.CreateShortcut('"+_ps_quote(shortcut)+"');"
         "$s.TargetPath='"+_ps_quote(launcher)+"';"
@@ -190,8 +191,9 @@ def _is_our_shortcut(path,root):
     path=Path(path);name=path.stem.lower()
     if 'mxb race day live' in name:return True
     info=_read_shortcut(path);target=str(info.get('target') or '').lower();args=str(info.get('arguments') or '').lower()
+    if Path(target).name.lower()==LAUNCHER_NAME.lower():return True
     app_py=str((Path(root).resolve()/'app.py')).lower()
-    return bool(app_py in args or (Path(target).name.lower() in ('pythonw.exe',LAUNCHER_NAME.lower()) and app_py in args))
+    return bool(app_py in args and Path(target).name.lower()=='pythonw.exe')
 
 
 def _migrate_pinned_shortcuts(root,launcher,icon):
