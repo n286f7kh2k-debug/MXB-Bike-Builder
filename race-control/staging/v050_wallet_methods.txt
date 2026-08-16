@@ -1,0 +1,64 @@
+    def _profile_wallet(self,r):
+        body=self._scrollable(self.content,pady=(0,24))
+        hero=self.card(body); hero.pack(fill='x',pady=(0,12))
+        top=tk.Frame(hero,bg=PANEL); top.pack(fill='x',padx=18,pady=18)
+        tk.Label(top,text='RACE WALLET',fg=MUTED,bg=PANEL,font=('Segoe UI Black',10)).pack(anchor='w')
+        tk.Label(top,text=f"${wallet_balance(self.conn,r['id']):,.2f}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',38)).pack(anchor='w')
+        tk.Label(top,text='Available for race entries',fg=TEXT,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w')
+        quick=tk.Frame(top,bg=PANEL); quick.pack(anchor='w',pady=(14,0))
+        for amt in (10,25,50,100):
+            tk.Button(quick,text=f'+ ${amt}',command=lambda a=amt:self._wallet_quick_add(a),bg=ACCENT if amt==25 else PANEL2,fg='white' if amt==25 else TEXT,relief='flat',font=('Segoe UI Black',9),padx=14,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+        tk.Button(quick,text='CUSTOM AMOUNT',command=self.add_funds_dialog,bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),padx=14,pady=8,cursor='hand2').pack(side='left')
+        tk.Label(hero,text='No-refund race entry policy: once a race entry is purchased, it is final except where mandatory law or payment-network rules require otherwise. Wallet funding is in DEMO MODE until an approved real-money provider is connected.',fg=MUTED,bg=PANEL,font=('Segoe UI',8),wraplength=1050,justify='left').pack(anchor='w',padx=18,pady=(0,16))
+        statement=self.card(body); statement.pack(fill='x')
+        tk.Label(statement,text='WALLET ACTIVITY',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        cols=('Date','Activity','Race','Amount','Balance'); t=ttk.Treeview(statement,columns=cols,show='headings',height=12)
+        for c,w in [('Date',170),('Activity',150),('Race',330),('Amount',120),('Balance',120)]:t.heading(c,text=c); t.column(c,width=w,anchor='w' if c in ('Activity','Race') else 'center')
+        for x in wallet_statement(self.conn,r['id'],100):
+            try: dt=datetime.fromisoformat(x['created_at']).strftime('%b %d, %Y %I:%M %p')
+            except Exception: dt=x['created_at']
+            t.insert('', 'end',values=(dt,x['kind'].replace('_',' ').title(),x['race_name'] or x['note'] or '—',f"{x['amount_cents']/100:+.2f}",f"${x['balance_after_cents']/100:.2f}"))
+        t.pack(fill='x',padx=14,pady=(0,14))
+
+
+    def rider(self):return self.conn.execute('SELECT * FROM riders WHERE username=?',(self.current_rider,)).fetchone()
+
+MISSING METHOD: do_signup
+
+
+    def open_race_details(self,race_id):
+        self.clear()
+        for b in self.nav_buttons.values():b.configure(bg='#101318',fg=TEXT)
+        race=self.conn.execute('SELECT * FROM races WHERE id=?',(race_id,)).fetchone()
+        if not race:return self.show('UPCOMING')
+        rider=self.rider(); ok=self.eligible(race,rider)
+        head=self.titlebar(race['name'],f"{self.race_class_label(race)} • {race['discipline']} • {race['track']}")
+        tk.Button(head,text='‹ BACK TO FIND A RACE',command=lambda:self.show('UPCOMING'),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),padx=12,pady=7,cursor='hand2').pack(anchor='w',pady=(10,0))
+        body=self._scrollable(self.content)
+        hero=self.card(body); hero.pack(fill='x')
+        photo=self._track_photo(hero,race['discipline'],race['track'],size=(1080,330)); photo.pack(fill='x',padx=14,pady=14)
+        paid,purse=current_purse(self.conn,race['id']); fast=fastest_lap_pool(self.conn,race['id']); payouts=[round(purse*x,2) for x in payout_split(paid)]
+        money=tk.Frame(hero,bg=PANEL2); money.pack(fill='x',padx=14,pady=(0,12))
+        vals=[('ENTRY',f"${race['entry_fee']:.2f}",TEXT),('MAIN PURSE',f"${purse:,.2f}",GOLD),('FASTEST LAP',f"${fast:,.2f}",GREEN),('RIDERS',f"{paid}/{race['max_riders']}",TEXT)]
+        for lab,val,col in vals:
+            f=tk.Frame(money,bg=PANEL2); f.pack(side='left',expand=True,fill='x',pady=11); tk.Label(f,text=lab,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(); tk.Label(f,text=val,fg=col,bg=PANEL2,font=('Segoe UI Black',15)).pack()
+        paytxt='  •  '.join(f"P{i+1} ${amt:,.2f}" for i,amt in enumerate(payouts)) if payouts else 'Payouts grow as paid riders enter.'
+        tk.Label(hero,text=f"CURRENT PROJECTED PAYOUTS: {paytxt}\nFASTEST LAP BONUS: ${fast:,.2f} • FINAL PURSE LOCKS BEFORE THE GATE DROPS",fg=GOLD,bg=PANEL,font=('Segoe UI Semibold',9),justify='left').pack(anchor='w',padx=16,pady=(0,8))
+        tk.Label(hero,text='ALL PAID RACE ENTRIES ARE FINAL • NO REFUNDS',fg=RED,bg=PANEL,font=('Segoe UI Black',9)).pack(anchor='w',padx=16,pady=(0,12))
+        if not ok:tk.Label(hero,text=f"LOCKED — requires {race['min_skill']}–{race['max_skill']} MMR and Racecraft {race['min_racecraft']}+.",fg=RED,bg=PANEL,font=('Segoe UI Black',10)).pack(anchor='w',padx=16,pady=(0,12))
+        roster=self.card(body); roster.pack(fill='x',pady=12)
+        tk.Label(roster,text='SIGNED UP RIDERS',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        cols=('Rider','Bike','Size','Signed Up','Skill','Etiquette'); tree=ttk.Treeview(roster,columns=cols,show='headings',height=7)
+        for c in cols:tree.heading(c,text=c); tree.column(c,width=150 if c!='Rider' else 210,anchor='center')
+        for x in self.conn.execute('''SELECT rd.*,rg.signed_up_at FROM registrations rg JOIN riders rd ON rd.id=rg.rider_id WHERE rg.race_id=? AND rg.payment_status='PAID' ORDER BY rg.signed_up_at''',(race['id'],)):
+            tree.insert('', 'end',values=(f"#{x['number']} {x['username']}",x['bike_model'],x['bike_size'],datetime.fromisoformat(x['signed_up_at']).strftime('%m/%d %I:%M %p'),f"{x['skill_class']} {x['skill_rating']}",f"{x['racecraft_grade']} {x['racecraft_score']}"))
+        tree.pack(fill='x',padx=14,pady=(0,12))
+        quote=member_quote(self.conn,rider['id'],race)
+        already=self.conn.execute('SELECT 1 FROM registrations WHERE race_id=? AND rider_id=?',(race['id'],rider['id'])).fetchone()
+        if already:text,state,color='✓ YOU ARE REGISTERED','disabled',GREEN
+        elif ok and quote['eligible']:text,state,color=f"ENTER RACE • MEMBER ${quote['member_price']:.2f}",'normal',GREEN
+        elif ok:text,state,color=f"ENTER RACE • ${race['entry_fee']:.2f}",'normal',ACCENT
+        else:text,state,color='RACE LOCKED','disabled',LINE
+        tk.Button(body,text=text,command=lambda:self.signup_demo(race),state=state,bg=color,fg='white',relief='flat',font=('Segoe UI Black',12),pady=12,cursor='hand2').pack(fill='x',pady=(0,14))
+        if already:self._race_day_launcher(body,race,rider)
+

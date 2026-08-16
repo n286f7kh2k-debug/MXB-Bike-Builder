@@ -1,0 +1,169 @@
+    def _profile_header(self,rider):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        header=self.card(self.content); header.pack(fill='x',padx=28,pady=(24,10))
+        banner=tk.Frame(header,bg='#0e1115',height=190); banner.pack(fill='x'); banner.pack_propagate(False)
+        banner_photo=self._load_profile_photo((rider['banner_path'] or '').strip(),(1180,190)) if 'banner_path' in rider.keys() else None
+        if banner_photo:
+            tk.Label(banner,image=banner_photo,bg='#0e1115').pack(fill='both',expand=True)
+        else:
+            can=tk.Canvas(banner,bg='#0e1115',highlightthickness=0); can.pack(fill='both',expand=True)
+            can.create_rectangle(0,0,1800,190,fill='#11161c',outline='')
+            for x in range(-200,1900,130): can.create_polygon(x,190,x+260,0,x+330,0,x+70,190,fill='#171d24',outline='')
+            can.create_text(28,32,text='MXB RACE DAY LIVE',anchor='nw',fill='#3b4652',font=('Segoe UI Black',25,'italic'))
+        identity=tk.Frame(header,bg=PANEL); identity.pack(fill='x',padx=18,pady=14)
+        avatar=self._profile_avatar(identity,rider,108); avatar.pack(side='left',padx=(0,18))
+        info=tk.Frame(identity,bg=PANEL); info.pack(side='left',fill='x',expand=True)
+        name_row=tk.Frame(info,bg=PANEL); name_row.pack(fill='x')
+        tk.Label(name_row,text=rider['username'],fg=TEXT,bg=PANEL,font=('Segoe UI Black',28)).pack(side='left')
+        tk.Label(name_row,text=f"  ◆ #{self.overall_rank(rider)}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',11)).pack(side='left',pady=(9,0))
+        meta=[f"#{rider['number']}" if rider['number'] else '',rider['team'] or '',rider['bike_model'] or '',rider['region'] or '']
+        tk.Label(info,text='  •  '.join(x for x in meta if x),fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w',pady=(2,9))
+        badges=tk.Frame(info,bg=PANEL); badges.pack(anchor='w')
+        for title,value,color in (
+            ('SKILL STATUS',f"{rider['skill_class'].upper()}  •  {rider['skill_rating']} MMR",GOLD),
+            ('ETIQUETTE',f"{rider['racecraft_grade']}  •  {self.etiquette_text(rider)}  •  {rider['racecraft_score']}",GREEN if rider['racecraft_score']>=800 else GOLD),
+        ):
+            box=tk.Frame(badges,bg=PANEL2,highlightbackground=LINE,highlightthickness=1); box.pack(side='left',padx=(0,8))
+            tk.Label(box,text=title,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(6,0))
+            tk.Label(box,text=value,fg=color,bg=PANEL2,font=('Segoe UI Black',10)).pack(anchor='w',padx=10,pady=(0,6))
+        return header
+
+
+    def _profile_subnav(self):
+        row=tk.Frame(self.content,bg=BG); row.pack(fill='x',padx=28,pady=(0,12))
+        for label,key in [('OVERVIEW','OVERVIEW'),('MY RACES','RACES'),('WALLET','WALLET'),('MEMBERSHIP','MEMBERSHIP'),('PROFILE SETTINGS','SETTINGS')]:
+            active=self.profile_section==key
+            tk.Button(row,text=label,command=lambda k=key:self._set_profile_section(k),bg=ACCENT if active else PANEL2,fg='white' if active else TEXT,activebackground=ACCENT,activeforeground='white',relief='flat',font=('Segoe UI Black' if active else 'Segoe UI Semibold',9),padx=16,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+
+
+    def _profile_overview(self,r):
+        top=tk.Frame(self.content,bg=BG); top.pack(fill='x',padx=23)
+        self.stat(top,'WALLET',f"${wallet_balance(self.conn,r['id']):,.2f}",True)
+        self.stat(top,'CAREER STARTS',f"{r['starts']}")
+        self.stat(top,'WINS / PODIUMS',f"{r['wins']} / {r['podiums']}")
+        self.stat(top,'CHAMPIONSHIPS',f"{r['championships']}")
+        self.stat(top,'CAREER EARNINGS',f"${r['career_earnings']:,.0f}",True)
+        body=tk.Frame(self.content,bg=BG); body.pack(fill='both',expand=True,padx=28,pady=16)
+        left=tk.Frame(body,bg=BG); left.pack(side='left',fill='both',expand=True,padx=(0,7))
+        right=tk.Frame(body,bg=BG); right.pack(side='left',fill='both',expand=True,padx=(7,0))
+
+        nextcard=self.card(left); nextcard.pack(fill='x')
+        tk.Label(nextcard,text='UPCOMING RACES',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        eligible=[x for x in self.conn.execute("SELECT * FROM races WHERE status='REGISTRATION' ORDER BY entry_fee,start_time") if self.eligible(x,r)]
+        for race in eligible[:3]:
+            paid,purse=current_purse(self.conn,race['id']); fast=fastest_lap_pool(self.conn,race['id'])
+            f=tk.Frame(nextcard,bg=PANEL2); f.pack(fill='x',padx=14,pady=4)
+            tk.Label(f,text=f"{self.race_class_label(race)}  •  {race['track']}",fg=ACCENT,bg=PANEL2,font=('Segoe UI Black',9)).pack(anchor='w',padx=10,pady=(9,1))
+            tk.Label(f,text=race['name'],fg=TEXT,bg=PANEL2,font=('Segoe UI Black',12)).pack(anchor='w',padx=10)
+            tk.Label(f,text=f"${race['entry_fee']:.2f} entry  •  ${purse:,.0f} purse  •  ${fast:,.0f} fastest lap",fg=MUTED,bg=PANEL2,font=('Segoe UI',9)).pack(anchor='w',padx=10,pady=(2,9))
+            self._bind_click_recursive(f,lambda rid=race['id']:self.open_race_details(rid))
+        if not eligible: tk.Label(nextcard,text='No eligible races are open right now.',fg=MUTED,bg=PANEL,font=('Segoe UI',10)).pack(anchor='w',padx=16,pady=(2,14))
+        tk.Button(nextcard,text='FIND A RACE',command=lambda:self.show('UPCOMING'),bg=ACCENT,fg='white',relief='flat',font=('Segoe UI Black',10),pady=9,cursor='hand2').pack(fill='x',padx=14,pady=(10,14))
+
+        about=self.card(left); about.pack(fill='x',pady=(12,0))
+        tk.Label(about,text='RIDER CARD',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,5))
+        tk.Label(about,text=r['bio'] or 'No bio yet. Add one in Profile Settings.',fg=TEXT,bg=PANEL,font=('Segoe UI',10),wraplength=540,justify='left').pack(anchor='w',padx=16,pady=(0,8))
+        for lab,val in [('HOMETOWN',r['hometown'] or '—'),('FAVORITE TRACK',r['favorite_track'] or '—'),('SOCIAL',r['social_link'] or '—')]:
+            tk.Label(about,text=f'{lab}:  {val}',fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',9)).pack(anchor='w',padx=16,pady=2)
+        tk.Button(about,text='CUSTOMIZE PROFILE',command=lambda:self._set_profile_section('SETTINGS'),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),pady=8,cursor='hand2').pack(fill='x',padx=14,pady=14)
+
+        hist=self.card(right); hist.pack(fill='both',expand=True)
+        tk.Label(hist,text='RECENT RESULTS',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        rows=list(self.conn.execute('''SELECT rs.position,rs.payout,rs.fast_lap_bonus,rs.skill_delta,rc.name,rc.track FROM results rs JOIN races rc ON rc.id=rs.race_id WHERE rs.rider_id=? ORDER BY rc.start_time DESC LIMIT 6''',(r['id'],)))
+        if not rows: tk.Label(hist,text='Completed race results will appear here automatically after MX Bikes sync.',fg=MUTED,bg=PANEL,font=('Segoe UI',10),wraplength=540,justify='left').pack(anchor='w',padx=16,pady=12)
+        for x in rows:
+            f=tk.Frame(hist,bg=PANEL2); f.pack(fill='x',padx=14,pady=4)
+            tk.Label(f,text=f"P{x['position']}  {x['name']}",fg=TEXT,bg=PANEL2,font=('Segoe UI Semibold',10)).pack(anchor='w',padx=10,pady=(8,1))
+            bonus=f"  •  +${x['fast_lap_bonus']:.0f} FAST LAP" if x['fast_lap_bonus'] else ''
+            tk.Label(f,text=f"{x['track']}  •  ${x['payout']:.0f}{bonus}  •  MMR {x['skill_delta']:+d}",fg=GOLD,bg=PANEL2,font=('Segoe UI Semibold',8)).pack(anchor='w',padx=10,pady=(0,8))
+        tk.Button(hist,text='VIEW ALL MY RACES',command=lambda:self._set_profile_section('RACES'),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),pady=8,cursor='hand2').pack(fill='x',padx=14,pady=14)
+
+
+    def _profile_my_races(self,r):
+        body=self._scrollable(self.content,pady=(0,24))
+        tk.Label(body,text='MY RACES',fg=TEXT,bg=BG,font=('Segoe UI Black',20)).pack(anchor='w',pady=(4,2))
+        tk.Label(body,text='Everything you have entered or completed, kept with your rider profile.',fg=MUTED,bg=BG,font=('Segoe UI',10)).pack(anchor='w',pady=(0,12))
+        upcoming=self.card(body); upcoming.pack(fill='x',pady=(0,12))
+        tk.Label(upcoming,text='UPCOMING REGISTRATIONS',fg=ACCENT,bg=PANEL,font=('Segoe UI Black',12)).pack(anchor='w',padx=16,pady=(14,7))
+        rows=list(self.conn.execute('''SELECT rc.*,rg.amount_paid,rg.signed_up_at FROM registrations rg JOIN races rc ON rc.id=rg.race_id WHERE rg.rider_id=? AND rc.status!='COMPLETE' ORDER BY rc.start_time''',(r['id'],)))
+        if not rows: tk.Label(upcoming,text='You have no upcoming paid registrations.',fg=MUTED,bg=PANEL,font=('Segoe UI',9)).pack(anchor='w',padx=16,pady=(0,14))
+        for race in rows:
+            f=tk.Frame(upcoming,bg=PANEL2); f.pack(fill='x',padx=14,pady=4)
+            tk.Label(f,text=race['name'],fg=TEXT,bg=PANEL2,font=('Segoe UI Black',11)).pack(side='left',padx=10,pady=11)
+            tk.Label(f,text=f"{race['track']}  •  {datetime.fromisoformat(race['start_time']).strftime('%b %d %I:%M %p')}  •  PAID ${race['amount_paid']:.2f}",fg=GOLD,bg=PANEL2,font=('Segoe UI Semibold',9)).pack(side='right',padx=10)
+            self._bind_click_recursive(f,lambda rid=race['id']:self.open_race_details(rid))
+        completed=self.card(body); completed.pack(fill='x')
+        tk.Label(completed,text='RACE HISTORY',fg=TEXT,bg=PANEL,font=('Segoe UI Black',12)).pack(anchor='w',padx=16,pady=(14,7))
+        cols=('Finish','Race','Track','Best Lap','Prize','Fast Lap','MMR'); t=ttk.Treeview(completed,columns=cols,show='headings',height=10)
+        for c in cols:t.heading(c,text=c); t.column(c,width=140 if c!='Race' else 260,anchor='center')
+        for x in self.conn.execute('''SELECT rs.*,rc.name,rc.track FROM results rs JOIN races rc ON rc.id=rs.race_id WHERE rs.rider_id=? ORDER BY rc.start_time DESC''',(r['id'],)):
+            t.insert('', 'end',values=(f"P{x['position']}",x['name'],x['track'],x['best_lap'] or '—',f"${x['payout']:.2f}",f"${x['fast_lap_bonus']:.2f}" if x['fast_lap_bonus'] else '—',f"{x['skill_delta']:+d}"))
+        t.pack(fill='x',padx=14,pady=(0,14))
+
+
+    def _profile_settings(self,r):
+        body=self._scrollable(self.content,pady=(0,24))
+        tk.Label(body,text='PROFILE SETTINGS',fg=TEXT,bg=BG,font=('Segoe UI Black',20)).pack(anchor='w',pady=(4,2))
+        tk.Label(body,text='Customize how your rider profile looks and how MX Bikes identifies you. Verified race statistics, MMR and etiquette scores stay protected.',fg=MUTED,bg=BG,font=('Segoe UI',10),wraplength=1050,justify='left').pack(anchor='w',pady=(0,12))
+        media=self.card(body); media.pack(fill='x',pady=(0,12))
+        tk.Label(media,text='PROFILE MEDIA',fg=ACCENT,bg=PANEL,font=('Segoe UI Black',12)).pack(anchor='w',padx=16,pady=(14,6))
+        choices={'avatar':r['avatar_path'] or '', 'banner':r['banner_path'] or ''}
+        def choose(kind):
+            src=filedialog.askopenfilename(title='Choose Profile Picture' if kind=='avatar' else 'Choose Profile Banner',filetypes=[('Images','*.png *.jpg *.jpeg *.webp *.gif *.bmp'),('All files','*.*')])
+            if not src:return
+            try:
+                choices[kind]=self._store_profile_image(src,r['id'],kind)
+                messagebox.showinfo('Profile Media',('Profile picture' if kind=='avatar' else 'Profile banner')+' selected. Click SAVE PROFILE to apply it.')
+            except Exception as exc:messagebox.showerror('Profile Media',str(exc))
+        media_btns=tk.Frame(media,bg=PANEL); media_btns.pack(fill='x',padx=16,pady=(0,14))
+        for label,kind in [('CHANGE PROFILE PICTURE','avatar'),('CHANGE BANNER','banner')]:
+            tk.Button(media_btns,text=label,command=lambda k=kind:choose(k),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),padx=12,pady=8,cursor='hand2').pack(side='left',padx=(0,7))
+        tk.Button(media_btns,text='REMOVE PICTURE',command=lambda:choices.update(avatar=''),bg=PANEL2,fg=MUTED,relief='flat',font=('Segoe UI',8),padx=9,pady=8).pack(side='left',padx=(8,4))
+        tk.Button(media_btns,text='REMOVE BANNER',command=lambda:choices.update(banner=''),bg=PANEL2,fg=MUTED,relief='flat',font=('Segoe UI',8),padx=9,pady=8).pack(side='left')
+
+        form=self.card(body); form.pack(fill='x')
+        tk.Label(form,text='RIDER INFORMATION',fg=TEXT,bg=PANEL,font=('Segoe UI Black',12)).pack(anchor='w',padx=16,pady=(14,8))
+        grid=tk.Frame(form,bg=PANEL); grid.pack(fill='x',padx=16)
+        fields={}
+        field_defs=[('RIDER NAME','username',r['username']),('RACE NUMBER','number',str(r['number'] or '')),('TEAM','team',r['team'] or ''),('BIKE MODEL','bike_model',r['bike_model'] or ''),('BIKE SIZE','bike_size',r['bike_size'] or ''),('REGION','region',r['region'] or ''),('HOMETOWN','hometown',r['hometown'] or ''),('FAVORITE TRACK','favorite_track',r['favorite_track'] or ''),('SOCIAL / LINK','social_link',r['social_link'] or ''),('PROFILE ACCENT (HEX)','profile_accent',r['profile_accent'] or ACCENT),('STEAM ID','steam_id',r['steam_id'] or ''),('MX BIKES GUID','mx_guid',r['mx_guid'] or ''),('MX BIKES PROFILE','game_profile_name',r['game_profile_name'] or '')]
+        for i,(label,key,value) in enumerate(field_defs):
+            row=i//2; col=i%2
+            cell=tk.Frame(grid,bg=PANEL); cell.grid(row=row,column=col,sticky='ew',padx=(0,10) if col==0 else (10,0),pady=5); grid.columnconfigure(col,weight=1)
+            tk.Label(cell,text=label,fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(anchor='w')
+            v=tk.StringVar(value=value); fields[key]=v
+            tk.Entry(cell,textvariable=v,bg=PANEL2,fg=TEXT,insertbackground=TEXT,relief='flat',font=('Segoe UI',10)).pack(fill='x',ipady=7,pady=(3,0))
+        tk.Label(form,text='BIO',fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(anchor='w',padx=16,pady=(10,3))
+        bio=tk.Text(form,height=4,bg=PANEL2,fg=TEXT,insertbackground=TEXT,relief='flat',font=('Segoe UI',10),wrap='word'); bio.pack(fill='x',padx=16); bio.insert('1.0',r['bio'] or '')
+        status=self.conn.execute("SELECT value FROM game_sync_state WHERE key='last_sync'").fetchone()
+        tk.Label(form,text=f"MX Bikes sync: {status['value'] if status else 'not synced yet'}",fg=GREEN if status else MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(anchor='w',padx=16,pady=(10,2))
+        linkbox=tk.Frame(form,bg=PANEL2); linkbox.pack(fill='x',padx=16,pady=(9,2))
+        tk.Label(linkbox,text='MX BIKES LINK',fg=ACCENT,bg=PANEL2,font=('Segoe UI Black',9)).pack(anchor='w',padx=10,pady=(9,2))
+        detected=self.game_bridge.game_exe()
+        tk.Label(linkbox,text=f"Detected game: {detected if detected else 'not found yet'}",fg=GREEN if detected else MUTED,bg=PANEL2,font=('Segoe UI',8),wraplength=970,justify='left').pack(anchor='w',padx=10)
+        exe_override_var=tk.StringVar(value=self.conn.execute("SELECT value FROM admin_settings WHERE key='mx_game_exe_override'").fetchone()[0] or '')
+        tk.Label(linkbox,text='GAME EXE OVERRIDE — leave blank for automatic Steam detection',fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(7,2))
+        tk.Entry(linkbox,textvariable=exe_override_var,bg=PANEL,fg=TEXT,insertbackground=TEXT,relief='flat',font=('Segoe UI',9)).pack(fill='x',padx=10,ipady=5)
+        server_host_var=None
+        if self.is_admin():
+            server_host_var=tk.StringVar(value=self.conn.execute("SELECT value FROM admin_settings WHERE key='mx_public_server_host'").fetchone()[0] or '')
+            tk.Label(linkbox,text='PUBLIC RACE SERVER HOST / IP — one-time server setting',fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(7,2))
+            tk.Entry(linkbox,textvariable=server_host_var,bg=PANEL,fg=TEXT,insertbackground=TEXT,relief='flat',font=('Segoe UI',9)).pack(fill='x',padx=10,ipady=5,pady=(0,9))
+        else:
+            tk.Label(linkbox,text='Race server address is published automatically by Race Day Live when the host opens the server.',fg=MUTED,bg=PANEL2,font=('Segoe UI',8)).pack(anchor='w',padx=10,pady=(7,9))
+        def save_profile():
+            name=fields['username'].get().strip()
+            if not name:messagebox.showerror('Profile Settings','Rider name cannot be blank.'); return
+            try:number=int(fields['number'].get().strip()) if fields['number'].get().strip() else None
+            except Exception:messagebox.showerror('Profile Settings','Race number must be a whole number.'); return
+            accent=fields['profile_accent'].get().strip()
+            if not re.fullmatch(r'#[0-9a-fA-F]{6}',accent): messagebox.showerror('Profile Settings','Profile accent must be a 6-digit hex color such as #f26a21.'); return
+            try:
+                self.conn.execute('''UPDATE riders SET username=?,number=?,team=?,bike_model=?,bike_size=?,region=?,hometown=?,favorite_track=?,social_link=?,profile_accent=?,steam_id=?,mx_guid=?,game_profile_name=?,bio=?,avatar_path=?,banner_path=? WHERE id=?''',
+                    (name,number,fields['team'].get().strip(),fields['bike_model'].get().strip(),fields['bike_size'].get().strip(),fields['region'].get().strip(),fields['hometown'].get().strip(),fields['favorite_track'].get().strip(),fields['social_link'].get().strip(),accent,fields['steam_id'].get().strip(),fields['mx_guid'].get().strip(),fields['game_profile_name'].get().strip(),bio.get('1.0','end').strip(),choices['avatar'],choices['banner'],r['id']))
+                self.conn.execute("UPDATE admin_settings SET value=? WHERE key='mx_game_exe_override'",(exe_override_var.get().strip(),))
+                if server_host_var is not None:self.conn.execute("UPDATE admin_settings SET value=? WHERE key='mx_public_server_host'",(server_host_var.get().strip(),))
+                self.conn.commit()
+            except Exception as exc: messagebox.showerror('Profile Settings',f'Could not save profile: {exc}'); return
+            self.current_rider=name; self.mx_agent.current_username=name; self.bike_garage.username=name
+            self.profile_section='OVERVIEW'; self.show('PROFILE')
+        tk.Button(form,text='SAVE PROFILE',command=save_profile,bg=ACCENT,fg='white',relief='flat',font=('Segoe UI Black',10),pady=10,cursor='hand2').pack(fill='x',padx=16,pady=16)

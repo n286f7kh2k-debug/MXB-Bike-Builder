@@ -1,0 +1,107 @@
+    def page_upcoming(self):
+        rider=self.rider(); body=self._scrollable(self.content,pady=(20,24))
+        head=tk.Frame(body,bg=BG); head.pack(fill='x',pady=(0,14))
+        tk.Label(head,text='FIND YOUR GATE',fg=TEXT,bg=BG,font=('Segoe UI Black',25)).pack(anchor='w')
+        tk.Label(head,text='Pick the stakes you want. Low Entry races are just $3 at every skill level; higher-stakes Cash and Premier races are still available.',fg=MUTED,bg=BG,font=('Segoe UI',10)).pack(anchor='w',pady=(2,10))
+        wallet=tk.Frame(head,bg=PANEL,highlightbackground=LINE,highlightthickness=1); wallet.pack(fill='x')
+        tk.Label(wallet,text='YOUR WALLET',fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(side='left',padx=(14,6),pady=11)
+        tk.Label(wallet,text=f"${wallet_balance(self.conn,rider['id']):,.2f}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',15)).pack(side='left',pady=8)
+        tk.Button(wallet,text='ADD MONEY',command=self.add_funds_dialog,bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',8),padx=10,pady=7,cursor='hand2').pack(side='right',padx=10,pady=7)
+        filters=tk.Frame(body,bg=BG); filters.pack(fill='x',pady=(0,12))
+        for lab,val in [('ALL RACES','ALL'),('LOW ENTRY','LOW ENTRY'),('CASH','CASH'),('PREMIER','PREMIER'),('MOTOCROSS','MX'),('SUPERCROSS','SX')]:
+            active=self.race_filter==val
+            tk.Button(filters,text=lab,command=lambda v=val:self._set_race_filter(v),bg=ACCENT if active else PANEL2,fg='white' if active else TEXT,relief='flat',font=('Segoe UI Black' if active else 'Segoe UI Semibold',8),padx=13,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+        races=list(self.conn.execute("SELECT * FROM races WHERE status='REGISTRATION' ORDER BY entry_fee,start_time"))
+        def keep(r):
+            f=self.race_filter
+            if f=='ALL':return True
+            if f=='LOW ENTRY':return r['lobby_tier']=='Low Entry'
+            if f in ('CASH','PREMIER'):return str(r['lobby_tier']).upper()==f
+            return r['discipline']==f
+        races=[r for r in races if keep(r)]
+        races.sort(key=lambda x:(0 if self.eligible(x,rider) else 1,float(x['entry_fee']),x['start_time']))
+        grid=tk.Frame(body,bg=BG); grid.pack(fill='x')
+        if not races:tk.Label(grid,text='No open races match this filter.',fg=MUTED,bg=BG,font=('Segoe UI',10)).pack(anchor='w',pady=20); return
+        for i,race in enumerate(races):
+            tile=self.card(grid); tile.grid(row=i//2,column=i%2,sticky='nsew',padx=6,pady=6); grid.columnconfigure(i%2,weight=1,uniform='races')
+            top=tk.Frame(tile,bg=PANEL); top.pack(fill='x',padx=14,pady=(12,5))
+            ok=self.eligible(race,rider); tag='LOW ENTRY' if race['lobby_tier']=='Low Entry' else str(race['lobby_tier']).upper()
+            tk.Label(top,text=f"{self.race_class_label(race)}  •  {race['discipline']}  •  {tag}",fg=ACCENT if ok else MUTED,bg=PANEL,font=('Segoe UI Black',9)).pack(side='left')
+            quote=member_quote(self.conn,rider['id'],race); price_text=(f"${quote['member_price']:.2f} MEMBER" if quote['eligible'] else f"${race['entry_fee']:.2f}")
+            tk.Label(top,text=price_text,fg=GREEN if quote['eligible'] else GOLD,bg=PANEL,font=('Segoe UI Black',14)).pack(side='right')
+            tk.Label(tile,text=race['name'],fg=TEXT if ok else MUTED,bg=PANEL,font=('Segoe UI Black',14),wraplength=480,justify='left').pack(anchor='w',padx=14)
+            try: when=datetime.fromisoformat(race['start_time']).strftime('%a %b %d • %I:%M %p')
+            except Exception: when=race['start_time']
+            tk.Label(tile,text=f"{race['track']}  •  {when}",fg=MUTED,bg=PANEL,font=('Segoe UI',9)).pack(anchor='w',padx=14,pady=(2,7))
+            photo=self._track_photo(tile,race['discipline'],race['track'],size=(520,170),on_click=lambda rid=race['id']:self.open_race_details(rid)); photo.pack(fill='x',padx=12,pady=(0,8))
+            paid,purse=current_purse(self.conn,race['id']); fast=fastest_lap_pool(self.conn,race['id'])
+            purse_text=f'${purse:,.0f}'
+            fast_text=f'${fast:,.0f}'
+            if race['lobby_tier']=='Low Entry':
+                display_riders=max(paid,int(race['min_riders']))
+                display_purse=display_riders*float(race['prize_contribution'])
+                display_fast=display_riders*float(race['fast_lap_contribution'] or 0)
+                grow='+' if paid<int(race['max_riders']) else ''
+                purse_text=f'${display_purse:,.0f}{grow}'
+                fast_text=f'${display_fast:,.0f}{grow}'
+            cash=tk.Frame(tile,bg=PANEL2); cash.pack(fill='x',padx=12,pady=(0,8))
+            for lab,val,col in [('PURSE',purse_text,GOLD),('FASTEST LAP',fast_text,GREEN),('RIDERS',f"{paid}/{race['max_riders']}",TEXT)]:
+                box=tk.Frame(cash,bg=PANEL2); box.pack(side='left',fill='x',expand=True,pady=9)
+                tk.Label(box,text=lab,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(); tk.Label(box,text=val,fg=col,bg=PANEL2,font=('Segoe UI Black',12)).pack()
+            text='VIEW & ENTER' if ok else 'VIEW REQUIREMENTS'
+            tk.Button(tile,text=text,command=lambda rid=race['id']:self.open_race_details(rid),bg=ACCENT if ok else PANEL2,fg='white' if ok else MUTED,relief='flat',font=('Segoe UI Black',9),pady=9,cursor='hand2').pack(fill='x',padx=12,pady=(0,12))
+
+
+    def open_race_details(self,race_id):
+        self.clear()
+        for b in self.nav_buttons.values():b.configure(bg='#101318',fg=TEXT)
+        race=self.conn.execute('SELECT * FROM races WHERE id=?',(race_id,)).fetchone()
+        if not race:return self.show('UPCOMING')
+        rider=self.rider(); ok=self.eligible(race,rider)
+        head=self.titlebar(race['name'],f"{self.race_class_label(race)} • {race['discipline']} • {race['track']}")
+        tk.Button(head,text='‹ BACK TO FIND A RACE',command=lambda:self.show('UPCOMING'),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),padx=12,pady=7,cursor='hand2').pack(anchor='w',pady=(10,0))
+        body=self._scrollable(self.content)
+        hero=self.card(body); hero.pack(fill='x')
+        photo=self._track_photo(hero,race['discipline'],race['track'],size=(1080,330)); photo.pack(fill='x',padx=14,pady=14)
+        paid,purse=current_purse(self.conn,race['id']); fast=fastest_lap_pool(self.conn,race['id']); payouts=[round(purse*x,2) for x in payout_split(paid)]
+        money=tk.Frame(hero,bg=PANEL2); money.pack(fill='x',padx=14,pady=(0,12))
+        vals=[('ENTRY',f"${race['entry_fee']:.2f}",TEXT),('MAIN PURSE',f"${purse:,.2f}",GOLD),('FASTEST LAP',f"${fast:,.2f}",GREEN),('RIDERS',f"{paid}/{race['max_riders']}",TEXT)]
+        for lab,val,col in vals:
+            f=tk.Frame(money,bg=PANEL2); f.pack(side='left',expand=True,fill='x',pady=11); tk.Label(f,text=lab,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(); tk.Label(f,text=val,fg=col,bg=PANEL2,font=('Segoe UI Black',15)).pack()
+        paytxt='  •  '.join(f"P{i+1} ${amt:,.2f}" for i,amt in enumerate(payouts)) if payouts else 'Payouts grow as paid riders enter.'
+        tk.Label(hero,text=f"CURRENT PROJECTED PAYOUTS: {paytxt}\nFASTEST LAP BONUS: ${fast:,.2f} • FINAL PURSE LOCKS BEFORE THE GATE DROPS",fg=GOLD,bg=PANEL,font=('Segoe UI Semibold',9),justify='left').pack(anchor='w',padx=16,pady=(0,8))
+        tk.Label(hero,text='ALL PAID RACE ENTRIES ARE FINAL • NO REFUNDS',fg=RED,bg=PANEL,font=('Segoe UI Black',9)).pack(anchor='w',padx=16,pady=(0,12))
+        if not ok:tk.Label(hero,text=f"LOCKED — requires {race['min_skill']}–{race['max_skill']} MMR and Racecraft {race['min_racecraft']}+.",fg=RED,bg=PANEL,font=('Segoe UI Black',10)).pack(anchor='w',padx=16,pady=(0,12))
+        roster=self.card(body); roster.pack(fill='x',pady=12)
+        tk.Label(roster,text='SIGNED UP RIDERS',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        cols=('Rider','Bike','Size','Signed Up','Skill','Etiquette'); tree=ttk.Treeview(roster,columns=cols,show='headings',height=7)
+        for c in cols:tree.heading(c,text=c); tree.column(c,width=150 if c!='Rider' else 210,anchor='center')
+        for x in self.conn.execute('''SELECT rd.*,rg.signed_up_at FROM registrations rg JOIN riders rd ON rd.id=rg.rider_id WHERE rg.race_id=? AND rg.payment_status='PAID' ORDER BY rg.signed_up_at''',(race['id'],)):
+            tree.insert('', 'end',values=(f"#{x['number']} {x['username']}",x['bike_model'],x['bike_size'],datetime.fromisoformat(x['signed_up_at']).strftime('%m/%d %I:%M %p'),f"{x['skill_class']} {x['skill_rating']}",f"{x['racecraft_grade']} {x['racecraft_score']}"))
+        tree.pack(fill='x',padx=14,pady=(0,12))
+        quote=member_quote(self.conn,rider['id'],race)
+        already=self.conn.execute('SELECT 1 FROM registrations WHERE race_id=? AND rider_id=?',(race['id'],rider['id'])).fetchone()
+        if already:text,state,color='✓ YOU ARE REGISTERED','disabled',GREEN
+        elif ok and quote['eligible']:text,state,color=f"ENTER RACE • MEMBER ${quote['member_price']:.2f}",'normal',GREEN
+        elif ok:text,state,color=f"ENTER RACE • ${race['entry_fee']:.2f}",'normal',ACCENT
+        else:text,state,color='RACE LOCKED','disabled',LINE
+        tk.Button(body,text=text,command=lambda:self.signup_demo(race),state=state,bg=color,fg='white',relief='flat',font=('Segoe UI Black',12),pady=12,cursor='hand2').pack(fill='x',pady=(0,14))
+        if already:self._race_day_launcher(body,race,rider)
+
+
+
+MISSING METHOD: race_card
+
+
+    def eligible(self,race,rider=None):
+        rider=rider or self.rider()
+        return race['min_skill']<=rider['skill_rating']<=race['max_skill'] and rider['racecraft_score']>=race['min_racecraft']
+
+
+    def race_class_label(self,race):
+        skill=str(race['skill_class']); bike=str(race['bike_class'])
+        if skill=='Rookie': return '250 C' if '250' in bike else '450 C' if '450' in bike else 'C CLASS'
+        if skill=='Amateur': return '250 B' if '250' in bike else '450 B' if '450' in bike else 'B CLASS'
+        if skill=='Expert': return '250 PRO'
+        if skill=='Pro': return '450 PRO'
+        return skill.upper()

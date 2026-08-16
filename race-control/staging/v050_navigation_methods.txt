@@ -1,0 +1,41 @@
+    def _layout(self):
+        header=tk.Frame(self,bg=BG,height=74); header.pack(fill='x'); header.pack_propagate(False)
+        brand=tk.Frame(header,bg=BG); brand.pack(side='left',padx=24)
+        tk.Label(brand,text='MXB',fg=TEXT,bg=BG,font=('Segoe UI Black',26,'italic')).pack(side='left')
+        tk.Label(brand,text=' RACE DAY',fg=TEXT,bg=BG,font=('Segoe UI Black',22)).pack(side='left')
+        tk.Label(brand,text=' LIVE',fg=ACCENT,bg=BG,font=('Segoe UI Black',22,'italic')).pack(side='left')
+        self.update_btn=tk.Button(header,text='UPDATE',command=self.do_update,bg=ACCENT,fg='white',activebackground='#ff7a30',relief='flat',font=('Segoe UI Semibold',10),padx=18,pady=8,cursor='hand2'); self.update_btn.pack(side='right',padx=24,pady=18)
+        tk.Label(header,text=f'v{VERSION}',fg=MUTED,bg=BG,font=('Segoe UI',9)).pack(side='right')
+        tk.Frame(self,bg=ACCENT,height=3).pack(fill='x')
+        body=tk.Frame(self,bg=BG); body.pack(fill='both',expand=True)
+        self.nav=tk.Frame(body,bg='#101318',width=205); self.nav.pack(side='left',fill='y'); self.nav.pack_propagate(False)
+        self.nav_buttons={}
+        for label,page in NAV:
+            if page=='ADMIN' and not self.is_admin():
+                continue
+            b=tk.Button(self.nav,text=label,anchor='w',command=lambda p=page:self.show(p),bg='#101318',fg=TEXT,activebackground=PANEL2,activeforeground='white',relief='flat',font=('Segoe UI Semibold',10),padx=22,pady=14,cursor='hand2')
+            b.pack(fill='x',pady=1); self.nav_buttons[page]=b
+        tk.Frame(self.nav,bg=LINE,height=1).pack(fill='x',padx=18,pady=15)
+        tk.Label(self.nav,text='RACE DAY STATUS',fg=MUTED,bg='#101318',font=('Segoe UI Semibold',8)).pack(anchor='w',padx=22)
+        self.mx_status_label=tk.Label(self.nav,text='● SYNCING MX BIKES…',fg=GOLD,bg='#101318',font=('Segoe UI Semibold',9),wraplength=165,justify='left')
+        self.mx_status_label.pack(anchor='w',padx=22,pady=(8,3))
+        self.mx_counts_label=tk.Label(self.nav,text='Game content: scanning',fg=MUTED,bg='#101318',font=('Segoe UI',8),wraplength=165,justify='left')
+        self.mx_counts_label.pack(anchor='w',padx=22,pady=(0,6))
+        self.mx_launch_btn=tk.Button(self.nav,text='LAUNCH MX BIKES',command=self._launch_mx_game,bg=ACCENT,fg='white',activebackground='#1591ff',relief='flat',font=('Segoe UI Black',8),padx=10,pady=7,cursor='hand2'); self.mx_launch_btn.pack(fill='x',padx=18,pady=(2,9))
+        tk.Label(self.nav,text='Payments: DEMO MODE',fg=MUTED,bg='#101318',font=('Segoe UI',8)).pack(anchor='w',padx=22)
+        self.content=tk.Frame(body,bg=BG); self.content.pack(side='left',fill='both',expand=True)
+
+
+    def show(self,name,force=False):
+        if name=='ADMIN' and not self.is_admin():name='PROFILE'
+        previous=getattr(self,'current_page',None)
+        if not force and name==previous and self.content.winfo_children():return
+        self.clear(stop_renderer=(previous=='GARAGE' and name!='GARAGE'))
+        self.current_page=name
+        for n,b in self.nav_buttons.items():b.configure(bg=PANEL2 if n==name else '#101318',fg=ACCENT if n==name else TEXT)
+        getattr(self,'page_'+name.lower().replace(' ','_'))()
+
+
+    def _set_profile_section(self,section):
+        self.profile_section=section
+        self.show('PROFILE',force=True)
