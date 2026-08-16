@@ -1,0 +1,7 @@
+{
+  "version": "1.0.0",
+  "moduleUrl": "",
+  "sha256": "",
+  "featureAssembly": "MXBRaceDayLive.Profile.dll",
+  "notes": "Initial native profile-home foundation. No module download is required for the bundled v1.0.0 profile."
+}
