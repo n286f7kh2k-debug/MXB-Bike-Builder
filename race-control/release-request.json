@@ -1,7 +1,7 @@
 {
-  "version": "0.5.8",
-  "filename": "MXB_Race_Day_Live_v0_5_8_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.8: changes Garage tabs to Bike, Helmet, Gear, Boots, Goggles, Gloves and Protection, keeps every selector as a real dropdown linked directly to the native MX Bikes profile, and adds an in-app rider-equipment viewer based only on PiBoSo's official MX Bikes rider template geometry from the official templates package. The official template is downloaded/cached lazily when a rider-equipment tab is first opened, parsed inside Race Day Live, and focused on the relevant rider region; no generic humanoid and no MX Bikes process are used. Bike preview uses exact readable source geometry only when supplied by the selected bike. Garage no longer flushes its content cache every time it opens. v0.5.7 PKZ/OEM category linking, v0.5.6 working taskbar icon, v0.5.4 two-way game/profile integration and stay-open hot updates are preserved.",
-  "builder_script": "race-control/build_v058_native_rider_tabs.py",
+  "version": "0.5.9",
+  "filename": "MXB_Race_Day_Live_v0_5_9_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.9 replaces the failed template/generic Garage viewer with a real MX Bikes asset pipeline adapted from Frost/mxb-app under its MIT license. A native Windows decoder compiled from Frost's pinned public EDF parser reads actual MX Bikes EDF geometry; Race Day Live reads real PNT paint sheets and EDF embedded textures, resolves the selected rider.edf and selected helmet/boots/protection EDFs, and uses .geom bike assembly without launching MX Bikes. The old generic/template rider viewer is removed. Creator-locked non-ZIP PKZs fail closed rather than being cracked or replaced with fake geometry. Bike/Helmet/Gear/Boots/Goggles/Gloves/Protection dropdowns, native profile sync, OEM category linking, the working taskbar icon, performance caches and stay-open hot updates are preserved.",
+  "builder_script": "race-control/build_v059_frost_native_edf.py",
   "build_attempt": 1
 }
