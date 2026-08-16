@@ -265,6 +265,15 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             Effect = Glow("#008CFF", 24, 0.55)
         });
         bannerGrid.Children.Add(heroIdentity);
+
+        // Reference-exact hero artwork sits on top of the old procedural art.
+        // This changes only the skin; banner size and page geometry stay untouched.
+        bannerGrid.Children.Add(new Rectangle
+        {
+            Fill = ThemeArt.HeaderBrush(),
+            Opacity = 1.0,
+            IsHitTestVisible = false
+        });
         profileStack.Children.Add(banner);
 
         var identity = new Grid { Margin = new Thickness(24, 16, 24, 20) };
@@ -384,7 +393,12 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         card.MouseLeftButtonUp += (_, _) => OpenSettings();
         card.ClipToBounds = true;
 
-        var root = new Grid { Background = FeatureCardBackground("#0B3150", "#06131F") };
+        var root = new Grid { Background = ThemeArt.LiveBrush() };
+        root.Children.Add(new Rectangle
+        {
+            Fill = Brush("#A904111D"),
+            IsHitTestVisible = false
+        });
         root.Children.Add(new Polygon
         {
             Points = new PointCollection(new[] { new Point(185, -20), new Point(270, -20), new Point(150, 200), new Point(70, 200) }),
@@ -645,8 +659,13 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         card.ToolTip = "Open the MX Bikes bike library inside Race Day Live";
         card.MouseLeftButtonUp += async (_, _) => await OpenBikeLibraryAsync();
 
-        var root = new Grid { Background = FeatureCardBackground("#0B3557", "#040F19") };
+        var root = new Grid { Background = ThemeArt.RiderBrush() };
         card.Child = root;
+        root.Children.Add(new Rectangle
+        {
+            Fill = Brush("#9A03111D"),
+            IsHitTestVisible = false
+        });
         root.Children.Add(new Polygon
         {
             Points = new PointCollection(new[] { new Point(160, -20), new Point(255, -20), new Point(115, 205), new Point(25, 205) }),
@@ -816,7 +835,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
             MinHeight = 148,
             Margin = new Thickness(0, 0, 14, 14),
             Padding = new Thickness(17),
-            Background = selected ? new LinearGradientBrush(Color("#0C3F61"), Color("#061522"), 40) : PanelBackground(),
+            Background = selected ? ThemeArt.RiderBrush() : PanelBackground(),
             BorderBrush = selected ? Brush("#14B8FF") : Brush("#0A5A89"),
             BorderThickness = new Thickness(selected ? 2 : 1),
             CornerRadius = new CornerRadius(13),
@@ -918,8 +937,8 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     {
         var top = new Border
         {
-            Background = new LinearGradientBrush(Color("#071E30"), Color("#030D17"), 0),
-            BorderBrush = Brush("#0A75AE"),
+            Background = ThemeArt.LiveBrush(),
+            BorderBrush = Brush("#00BFFF"),
             BorderThickness = new Thickness(0, 0, 0, 1),
             Padding = new Thickness(28, 19, 28, 18),
             Effect = Glow("#004E78", 12, 0.16)
@@ -928,6 +947,11 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
         top.Child = grid;
+        grid.Children.Add(new Rectangle
+        {
+            Fill = Brush("#B2040E18"),
+            IsHitTestVisible = false
+        });
 
         var back = new Button
         {
@@ -1142,11 +1166,11 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     private static Border Card(Thickness margin) => new()
     {
         Background = PanelBackground(),
-        BorderBrush = Brush("#0B6B9F"),
-        BorderThickness = new Thickness(1.25),
+        BorderBrush = Brush("#00AFFF"),
+        BorderThickness = new Thickness(1.55),
         CornerRadius = new CornerRadius(11),
         Margin = margin,
-        Effect = Glow("#0066A4", 18, 0.24),
+        Effect = Glow("#008CFF", 22, 0.36),
         SnapsToDevicePixels = true
     };
 
@@ -1252,6 +1276,18 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         var canvas = new Canvas { IsHitTestVisible = false, Opacity = 1.0 };
         Panel.SetZIndex(canvas, -10);
 
+        var themeBackdrop = new Rectangle
+        {
+            Width = 1600,
+            Height = 360,
+            Fill = ThemeArt.HeaderBrush(),
+            Opacity = 0.20,
+            Effect = new BlurEffect { Radius = 10 }
+        };
+        Canvas.SetLeft(themeBackdrop, 0);
+        Canvas.SetTop(themeBackdrop, -70);
+        canvas.Children.Add(themeBackdrop);
+
         var glow = new Ellipse
         {
             Width = 900, Height = 900,
@@ -1285,7 +1321,8 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     {
         var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
         brush.GradientStops.Add(new GradientStop(Color(top), 0.00));
-        brush.GradientStops.Add(new GradientStop(Color("#071724"), 0.48));
+        brush.GradientStops.Add(new GradientStop(Color("#073252"), 0.34));
+        brush.GradientStops.Add(new GradientStop(Color("#061522"), 0.66));
         brush.GradientStops.Add(new GradientStop(Color(bottom), 1.00));
         return brush;
     }
@@ -1303,9 +1340,9 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     private static Brush PanelBackground()
     {
         var brush = new LinearGradientBrush { StartPoint = new Point(0, 0), EndPoint = new Point(1, 1) };
-        brush.GradientStops.Add(new GradientStop(Color("#0A2132"), 0.00));
-        brush.GradientStops.Add(new GradientStop(Color("#061521"), 0.52));
-        brush.GradientStops.Add(new GradientStop(Color("#020A11"), 1.00));
+        brush.GradientStops.Add(new GradientStop(Color("#0B2B45"), 0.00));
+        brush.GradientStops.Add(new GradientStop(Color("#06192A"), 0.48));
+        brush.GradientStops.Add(new GradientStop(Color("#01070D"), 1.00));
         return brush;
     }
 
