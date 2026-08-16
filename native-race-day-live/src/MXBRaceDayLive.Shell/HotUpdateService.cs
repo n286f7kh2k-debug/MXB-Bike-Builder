@@ -1,5 +1,7 @@
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 using MXBRaceDayLive.Contracts;
 
@@ -7,7 +9,7 @@ namespace MXBRaceDayLive.Shell;
 
 public sealed class HotUpdateService : IUpdateService, IDisposable
 {
-    private static readonly HttpClient Client = new() { Timeout = TimeSpan.FromSeconds(30) };
+    private static readonly HttpClient Client = CreateClient();
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true, WriteIndented = true };
     private readonly string _manifestUrl;
     private readonly string _moduleRoot;
@@ -45,11 +47,25 @@ public sealed class HotUpdateService : IUpdateService, IDisposable
 
     public async Task CheckAndApplyAsync(CancellationToken cancellationToken = default)
     {
-        if (!await _gate.WaitAsync(0, cancellationToken)) return;
+        if (!await _gate.WaitAsync(0, cancellationToken))
+        {
+            Status("Update check already running…");
+            return;
+        }
+
         try
         {
             Status("Checking for updates…");
-            var json = await Client.GetStringAsync(_manifestUrl, cancellationToken);
+
+            // raw.githubusercontent.com is intentionally cacheable. A fixed latest.json URL can
+            // therefore return the previous manifest for several minutes after a release. Every
+            // check gets a unique query token and explicit no-cache headers so manual checks are
+            // actually live checks.
+            var manifestRequestUrl = CacheBust(
+                _manifestUrl,
+                DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString());
+            var manifestBytes = await DownloadNoCacheAsync(manifestRequestUrl, cancellationToken);
+            var json = Encoding.UTF8.GetString(manifestBytes).TrimStart('\uFEFF');
             var manifest = JsonSerializer.Deserialize<UpdateManifest>(json, JsonOptions)
                            ?? throw new InvalidOperationException("The update manifest is invalid.");
             if (!Version.TryParse(manifest.Version, out var next))
@@ -67,10 +83,19 @@ public sealed class HotUpdateService : IUpdateService, IDisposable
                 throw new InvalidOperationException("The live module activator is unavailable.");
 
             Status($"Downloading v{next}…");
-            var bytes = await Client.GetByteArrayAsync(manifest.ModuleUrl, cancellationToken);
+            var expectedSha = manifest.Sha256.Trim().ToLowerInvariant();
+            if (expectedSha.Length != 64)
+                throw new InvalidOperationException("The update SHA-256 value is invalid.");
+
+            // Versioned module URLs should already be immutable, but the SHA token also prevents
+            // any stale intermediary response from being reused after a republish/correction.
+            var moduleRequestUrl = CacheBust(
+                manifest.ModuleUrl,
+                $"{next}-{expectedSha[..12]}");
+            var bytes = await DownloadNoCacheAsync(moduleRequestUrl, cancellationToken);
             var digest = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
             if (!CryptographicOperations.FixedTimeEquals(
-                    Convert.FromHexString(digest), Convert.FromHexString(manifest.Sha256.Trim())))
+                    Convert.FromHexString(digest), Convert.FromHexString(expectedSha)))
                 throw new InvalidOperationException("The downloaded update failed SHA-256 verification.");
 
             var versionDir = Path.Combine(_moduleRoot, next.ToString());
@@ -101,13 +126,49 @@ public sealed class HotUpdateService : IUpdateService, IDisposable
         }
         catch (Exception ex)
         {
-            Status("Update failed · current version kept");
+            var reason = ex.Message.Replace('\r', ' ').Replace('\n', ' ').Trim();
+            if (reason.Length > 170) reason = reason[..167] + "…";
+            Status(string.IsNullOrWhiteSpace(reason)
+                ? "Update failed · current version kept"
+                : $"Update failed · {reason}");
             System.Diagnostics.Debug.WriteLine(ex);
         }
         finally
         {
             _gate.Release();
         }
+    }
+
+    private static HttpClient CreateClient()
+    {
+        var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd("MXB-Race-Day-Live-Updater/1.0");
+        return client;
+    }
+
+    private static async Task<byte[]> DownloadNoCacheAsync(string url, CancellationToken cancellationToken)
+    {
+        using var request = new HttpRequestMessage(HttpMethod.Get, url);
+        request.Headers.CacheControl = new CacheControlHeaderValue
+        {
+            NoCache = true,
+            NoStore = true,
+            MaxAge = TimeSpan.Zero
+        };
+        request.Headers.Pragma.ParseAdd("no-cache");
+
+        using var response = await Client.SendAsync(
+            request,
+            HttpCompletionOption.ResponseHeadersRead,
+            cancellationToken);
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadAsByteArrayAsync(cancellationToken);
+    }
+
+    private static string CacheBust(string url, string token)
+    {
+        var separator = url.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        return $"{url}{separator}rdl={Uri.EscapeDataString(token)}";
     }
 
     private void CleanupOldVersions(string keepPath)
