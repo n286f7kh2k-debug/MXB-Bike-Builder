@@ -1,0 +1,33 @@
+name: Apply v1.0.14 Game HUD Theme
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/scripts/patch_v1014_game_hud_theme.py'
+      - '.github/workflows/run-v1014-game-hud-theme.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+      - name: Apply stronger existing-app theme
+        run: python .github/scripts/patch_v1014_game_hud_theme.py
+      - name: Commit theme rebuild
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
+          if git diff --cached --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+          git commit -m "Rebuild existing UI with stronger game HUD theme"
+          git push origin native-rebuild
