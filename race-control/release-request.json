@@ -1,7 +1,7 @@
 {
-  "version": "0.5.5",
-  "filename": "MXB_Race_Day_Live_v0_5_5_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.5: replaces the substitute Garage viewer with a live mirror of the actual MX Bikes Bike Selection renderer using Windows DWM, while keeping the source simulator window behind Race Day Live and out of the taskbar. Garage input is forwarded to the real game UI so installed bikes, riders, paints and gear are rendered by MX Bikes itself. This release also creates a dedicated MXB Race Day Live.exe launcher from the active pythonw runtime, switches to one permanent AppUserModelID, makes the desktop shortcut target that named EXE, and uses the desktop shortcut's actual Explorer-rendered icon for the running taskbar button. v0.5.4 two-way game/profile integration and stay-open hot updating are preserved.",
-  "builder_script": "race-control/build_v055_native_game_garage.py",
+  "version": "0.5.6",
+  "filename": "MXB_Race_Day_Live_v0_5_6_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.5.6: corrective stability release built from the stable v0.5.4 extension/hot-update base. The v0.5.5 DWM/game-mirror path is completely removed so Garage cannot launch MX Bikes, cannot create a black mirror surface, and cannot consume resources in the background. The real two-way MX Bikes profile/content sync, native Bike/Head/Torso/Legs selection workflow, race loadout capture/apply, and stay-open hot updater remain. The taskbar path now extracts the exact desktop shortcut icon into a concrete multi-size assets/mxb_race_day_live.ico, applies that file directly through Tk + WM_SETICON/class icons, keeps one permanent AppUserModelID, migrates the shortcut to a dedicated MXB Race Day Live.exe launcher, and refreshes Explorer's icon cache.",
+  "builder_script": "race-control/build_v056_stability_icon.py",
   "build_attempt": 1
 }
