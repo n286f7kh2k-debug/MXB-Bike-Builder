@@ -3,5 +3,5 @@
   "filename": "MXB_Race_Day_Live_v0_3_2_UPDATE.zip",
   "notes": "Inspection pass only; no release publication.",
   "builder_script": "race-control/inspect_v032_game_bridge.py",
-  "inspect_attempt": 4
+  "inspect_attempt": 5
 }
