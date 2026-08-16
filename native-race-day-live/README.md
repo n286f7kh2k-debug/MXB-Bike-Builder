@@ -29,6 +29,10 @@ The public iNsane viewer package is obtained from its publisher endpoint by Race
 
 The iNsane component's required .NET 6 Desktop Runtime is also provisioned privately under Race Day Live's LocalAppData component folder. Runtime provisioning is deliberately lazy: it happens only when a sealed-bike preview is opened, never during hot-module activation, so viewer setup cannot break the in-app update transaction.
 
+## Settings / Game File Links
+
+The profile home includes a Settings entry with a Game File Links page. Users can manually link the MX Bikes install folder, user-data folder, mods root, bikes folder, rider folder, helmets, boots, and an optional paints location. Each row includes a folder browser and live found/missing state. Links are stored under Race Day Live's LocalAppData settings directory. The manually linked Bikes folder is merged into the Garage scan and wins for duplicate bike IDs so users can override incorrect auto-detection without changing MX Bikes itself.
+
 ## Update architecture
 
 The native shell is intentionally small and stable. Normal releases update feature modules and assets instead of replacing the running executable. A module update is downloaded to a staging directory, SHA-256 verified, loaded next to the current module, and rendered in the existing content region. Only after successful activation is the new module persisted as the startup version. The main window remains open throughout the update; a failed module leaves the existing feature running.
