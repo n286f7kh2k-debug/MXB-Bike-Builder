@@ -94,6 +94,7 @@ jobs:
           </Project>
           "@ | Set-Content -LiteralPath (Join-Path $smoke 'ModelSmoke.csproj')
           @'
+          using System.IO;
           using MXBRaceDayLive.PaintCreator.Models;
           using MXBRaceDayLive.PaintCreator.Services;
 
