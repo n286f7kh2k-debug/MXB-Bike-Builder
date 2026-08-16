@@ -112,8 +112,10 @@ fn run() -> Result<(), String> {
         })
         .collect();
 
+    // Keep the existing payload contract so the hot-swappable v1.x profile viewer accepts
+    // this improved decoder without a shell restart or EXE replacement.
     let decoded = DecodeOut {
-        format: "MXB-RDL-EDF-2",
+        format: "MXB-RDL-EDF-1",
         mode,
         nodes,
     };
