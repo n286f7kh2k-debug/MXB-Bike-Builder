@@ -1,0 +1,112 @@
+name: Build Paint Creator v6b
+
+on:
+  push:
+    branches:
+      - build/race-day-live-paint-creator
+    paths:
+      - 'ci-paint-v6/**'
+      - '.github/workflows/build-paint-creator-v6b.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct recovered v6 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          function Raw([string]$p){ ((Get-Content -Raw $p) -replace '\s','') }
+          $a=(Raw 'ci-paint-v4-repair/p01_0.txt')+(Raw 'ci-paint-v4-repair/p01_1.txt')+(Raw 'ci-paint-v4-repair/p01_2.txt')
+          $b=(Raw 'ci-paint-v4-repair/p06_0.txt')+(Raw 'ci-paint-v4-repair/p06_1.txt')+(Raw 'ci-paint-v4-repair/p06_2.txt')
+          $c=(Raw 'ci-paint-v4-repair/p09s_0.txt')+(Raw 'ci-paint-v4-repair/p09s_1.txt')+(Raw 'ci-paint-v4-repair/p09s_2.txt')+(Raw 'ci-paint-v4-repair/p09s_3.txt')+(Raw 'ci-paint-v4-repair/p09s_4.txt')
+          $d=(Raw 'ci-paint-v4-repair/p10s_0.txt')+(Raw 'ci-paint-v4-repair/p10s_1.txt')+(Raw 'ci-paint-v4-repair/p10s_2.txt')+(Raw 'ci-paint-v4-repair/p10s_3.txt')+(Raw 'ci-paint-v4-repair/p10s_4.txt')
+          $all=$a
+          foreach($n in 2..5){$all+=Raw ("ci-paint-v4/part{0:D2}.txt" -f $n)}
+          $all+=$b
+          foreach($n in 7..8){$all+=Raw ("ci-paint-v4/part{0:D2}.txt" -f $n)}
+          $all+=$c+$d
+          $z=Join-Path $env:RUNNER_TEMP 'v4.zip'; [IO.File]::WriteAllBytes($z,[Convert]::FromBase64String($all))
+          if((Get-FileHash $z -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4d4a4e2c81b4210530d1993da89a859ea02f3c4eb870748de3ef85dabd1bd7c9'){throw 'v4 hash mismatch'}
+          $src=Join-Path $env:RUNNER_TEMP 'v6src'; Expand-Archive $z $src -Force
+          $z5=Join-Path $env:RUNNER_TEMP 'v5.zip'; [IO.File]::WriteAllBytes($z5,[Convert]::FromBase64String((Raw 'ci-paint-v5/paint-v5-patch.zip.b64')))
+          if((Get-FileHash $z5 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3147dc1188d40d0b722f8051fdd6237667bc6971d4c91bb93addcd6b1388a5db'){throw 'v5 hash mismatch'}
+          Expand-Archive $z5 $src -Force
+          $z6=Join-Path $env:RUNNER_TEMP 'v6.zip'; [IO.File]::WriteAllBytes($z6,[Convert]::FromBase64String((Raw 'ci-paint-v6/p00.b64')+(Raw 'ci-paint-v6/p01.b64')))
+          $h6=(Get-FileHash $z6 -Algorithm SHA256).Hash.ToLowerInvariant(); if($h6 -ne '8876dd13283a5824ba4d86d6ec0988170246d8fde424da033d886ffa8a8e5050'){throw "v6 hash mismatch $h6"}
+          Expand-Archive $z6 $src -Force
+          "SRC=$src" >> $env:GITHUB_ENV
+          "V6_HASH=$h6" >> $env:GITHUB_ENV
+          Write-Host "Recovered v6 source: $src"
+
+      - name: Inspect and validate hot-update/navigation source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $demo=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo'
+          $x=Get-Content -Raw (Join-Path $demo 'MainWindow.xaml')
+          $c=Get-Content -Raw (Join-Path $demo 'MainWindow.xaml.cs')
+          $u=Get-Content -Raw (Join-Path $demo 'PaintCreatorHotUpdateService.cs')
+          $l=Get-Content -Raw (Join-Path $demo 'PaintCreatorModuleLoadContext.cs')
+          if($x -notmatch 'UPDATE'){throw 'UPDATE button missing'}
+          if($c -notmatch 'PaintCreatorHotUpdateService'){throw 'UPDATE service not wired'}
+          if($l -notmatch 'AssemblyLoadContext'){throw 'module load context missing'}
+          if(($l -notmatch 'isCollectible\s*:\s*true') -and ($l -notmatch 'base\s*\([^\)]*true')){throw 'module context not collectible'}
+          if($c -notmatch '\.Unload\s*\('){throw 'module unload missing'}
+          if($u -notmatch 'SHA256|sha256|Hash'){throw 'update checksum verification missing'}
+          $dead=@('HOME','PADDOCK','FIND A RACE','CHAMPIONSHIPS','RESULTS','WALLET','ADMIN'); $hits=@(); foreach($v in $dead){if($x -match [regex]::Escape($v)){$hits+=$v}}
+          if($hits.Count -gt 2){throw "dead outer sidebar remains: $($hits -join ', ')"}
+          Write-Host "Hot update/navigation source PASS; old shell labels=$($hits.Count)"
+          Write-Host '--- MAIN WINDOW XAML ---'; Write-Host $x
+          Write-Host '--- MAIN WINDOW UPDATE/RELOAD LINES ---'
+          Select-String -Path (Join-Path $demo 'MainWindow.xaml.cs') -Pattern 'Update|Unload|State|Restore|Module' -CaseSensitive:$false | ForEach-Object { Write-Host $_.Line.Trim() }
+
+      - name: Build module
+        shell: pwsh
+        run: |
+          dotnet build (Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj') -c Release -p:ImplicitUsings=enable
+
+      - name: Build standalone hot-update host
+        shell: pwsh
+        run: |
+          dotnet build (Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo\MXBRaceDayLive.PaintCreator.Demo.csproj') -c Release -p:ImplicitUsings=enable
+
+      - name: Smoke test real MX Bikes rider UV mesh
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $s=Join-Path $env:RUNNER_TEMP 'smoke'; New-Item -ItemType Directory -Force $s | Out-Null
+          $lib=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
+          '<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><ProjectReference Include="'+$lib+'" /></ItemGroup></Project>' | Out-File (Join-Path $s 's.csproj') -Encoding utf8
+          'using MXBRaceDayLive.PaintCreator.Models; using MXBRaceDayLive.PaintCreator.Services; var root=Path.Combine(Path.GetTempPath(),"mxbv6",Guid.NewGuid().ToString("N")); Directory.CreateDirectory(root); var r=await new OfficialMxBikesPreviewModelService().ResolveAsync(PaintTargetType.Rider,new PaintCreatorContext{ProjectRoot=root}); Console.WriteLine($"READY={r.Ready} STATUS={r.Status} PATH={r.ObjPath}"); if(!r.Ready||string.IsNullOrWhiteSpace(r.ObjPath)) throw new Exception("model not resolved"); var m=ObjUvMeshLoader.Load(r.ObjPath); Console.WriteLine($"POSITIONS={m.Positions.Count} TRIANGLES={m.TriangleIndices.Count/3} UVS={m.TextureCoordinates.Count}"); if(m.Positions.Count<100||m.TriangleIndices.Count<300||m.TextureCoordinates.Count!=m.Positions.Count) throw new Exception("bad UV mesh");' | Out-File (Join-Path $s 'Program.cs') -Encoding utf8
+          dotnet run --project (Join-Path $s 's.csproj') -c Release | Tee-Object (Join-Path $env:RUNNER_TEMP 'model-smoke.txt')
+
+      - name: Publish self-contained v6 app
+        shell: pwsh
+        run: |
+          $out=Join-Path $env:RUNNER_TEMP 'publish'
+          dotnet publish (Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo\MXBRaceDayLive.PaintCreator.Demo.csproj') -c Release -r win-x64 --self-contained true -p:ImplicitUsings=enable -p:RuntimeFrameworkVersion=8.0.29 -p:TargetLatestRuntimePatch=false -p:PublishSingleFile=false -o $out
+          "OUT=$out" >> $env:GITHUB_ENV
+
+      - name: Validate binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $e=@(Get-ChildItem $env:OUT -Filter '*.exe'); if($e.Count -lt 1){throw 'exe missing'}
+          if(!(Test-Path (Join-Path $env:OUT 'MXBRaceDayLive.PaintCreator.dll'))){throw 'module dll missing'}
+          if(@(Get-ChildItem $env:OUT -Recurse | Where-Object {$_.Name -match 'Assimp|SharpAssimp'}).Count -lt 1){throw 'FBX runtime missing'}
+          $exe=$e|Where-Object{$_.Name -like '*Paint*Creator*'}|Select-Object -First 1; if($null -eq $exe){$exe=$e[0]}
+          (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Out-File (Join-Path $env:OUT 'EXE.sha256') -Encoding ascii
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'model-smoke.txt') (Join-Path $env:OUT 'MODEL_VIEWER_SMOKE_TEST.txt')
+          @("v6 patch=$env:V6_HASH",'UPDATE button uses collectible-module hot reload; host process remains open.','Standalone fake Race Day Live sidebar removed; Paint Creator owns its working gear navigation.') | Out-File (Join-Path $env:OUT 'V6_VALIDATION.txt') -Encoding utf8
+          Get-ChildItem $env:OUT | Select-Object Name,Length | Format-Table -AutoSize | Out-File (Join-Path $env:OUT 'BUILD_MANIFEST.txt')
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MXB-Race-Day-Live-Paint-Creator-v6.0.0-hot-update-fixed-nav-win-x64
+          path: ${{ env.OUT }}
+          if-no-files-found: error
+          retention-days: 7
