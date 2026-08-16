@@ -273,7 +273,8 @@ internal static class InsaneBikePreviewProvider
 
         private static void SelectBike(IntPtr hwnd, string bikeId, CancellationToken cancellationToken)
         {
-            var root = AutomationElement.FromHandle(hwnd) ?? return;
+            var root = AutomationElement.FromHandle(hwnd);
+            if (root is null) return;
 
             var bikesTab = FindElement(root, e =>
             {
