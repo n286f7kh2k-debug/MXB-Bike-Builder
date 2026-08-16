@@ -17,9 +17,13 @@ Fresh native Windows rebuild. The previous Python-hosted application is intentio
 
 ## First checkpoint
 
-The first checkpoint intentionally contains only the native shell, profile-card home feature, persistent rider profile, MX Bikes environment/profile detection, Launch MX Bikes, and the live feature updater. Garage, races, wallet, championships, gear customization and 3D creation are deliberately not enabled yet.
+The first checkpoint intentionally contains only the native shell, profile-card home feature, persistent rider profile, MX Bikes environment/profile detection, Launch MX Bikes, and the live feature updater. Larger race-day systems are being added back one at a time after the native foundation is validated.
 
 The Windows build publishes a self-contained `MXB Race Day Live.exe` and a separate `MXBRaceDayLive.Profile.dll` module. There is no Python launcher or Python-owned window in this rebuild.
+
+## Garage / 3D preview
+
+The Garage reads installed MX Bikes bike IDs and loadout state without launching MX Bikes. Plain readable EDF geometry uses the native Race Day Live viewer. Creator-sealed EDF geometry is routed through an external authorized preview provider instead of being mis-parsed or replaced with a fake model. The first sealed-bike provider can attach to the user's installed MXB App/Frost renderer, drive its normal Studio controls to the clicked bike ID, and host the working renderer inside the Race Day Live Garage while MX Bikes remains closed.
 
 ## Update architecture
 
