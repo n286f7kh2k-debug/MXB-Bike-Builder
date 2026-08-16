@@ -1,5 +1,5 @@
 {
-  "decoderUrl": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/native-rebuild/native-race-day-live/updates/assets/mxb_asset_decoder.exe?v=1.0.6-hotfix1",
-  "sha256": "646ab3e37b6472e6dce5ea30d9b2b9d8f8efa0028cc82101b5ce604594b1eaa8",
-  "noticeUrl": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/native-rebuild/native-race-day-live/updates/assets/Frost-mxb-app-MIT.txt?v=1.0.6-hotfix1"
+  "decoderUrl": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/native-rebuild/native-race-day-live/updates/assets/mxb_asset_decoder.exe",
+  "sha256": "848f319e0d5e5c0b1125fd941ea3f0575a742c8e357286f72bb61d0be7e9cfc2",
+  "noticeUrl": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/native-rebuild/native-race-day-live/updates/assets/Frost-mxb-app-MIT.txt"
 }
