@@ -1,0 +1,38 @@
+name: Export Paint Creator v5 Source
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths: ['.github/workflows/export-paint-v5-source.yml']
+  workflow_dispatch:
+jobs:
+  export:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct v5 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          function Raw([string]$p){ ((Get-Content -Raw $p) -replace '\s','') }
+          $p01=(Raw 'ci-paint-v4-repair/p01_0.txt')+(Raw 'ci-paint-v4-repair/p01_1.txt')+(Raw 'ci-paint-v4-repair/p01_2.txt')
+          $p06=(Raw 'ci-paint-v4-repair/p06_0.txt')+(Raw 'ci-paint-v4-repair/p06_1.txt')+(Raw 'ci-paint-v4-repair/p06_2.txt')
+          $p09=(Raw 'ci-paint-v4-repair/p09s_0.txt')+(Raw 'ci-paint-v4-repair/p09s_1.txt')+(Raw 'ci-paint-v4-repair/p09s_2.txt')+(Raw 'ci-paint-v4-repair/p09s_3.txt')+(Raw 'ci-paint-v4-repair/p09s_4.txt')
+          $p10=(Raw 'ci-paint-v4-repair/p10s_0.txt')+(Raw 'ci-paint-v4-repair/p10s_1.txt')+(Raw 'ci-paint-v4-repair/p10s_2.txt')+(Raw 'ci-paint-v4-repair/p10s_3.txt')+(Raw 'ci-paint-v4-repair/p10s_4.txt')
+          $b=$p01
+          foreach($n in 2..5){$b+=Raw ("ci-paint-v4/part{0:D2}.txt" -f $n)}
+          $b+=$p06
+          foreach($n in 7..8){$b+=Raw ("ci-paint-v4/part{0:D2}.txt" -f $n)}
+          $b+=$p09+$p10
+          $z=Join-Path $env:RUNNER_TEMP 'v4.zip'; [IO.File]::WriteAllBytes($z,[Convert]::FromBase64String($b))
+          if((Get-FileHash $z -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4d4a4e2c81b4210530d1993da89a859ea02f3c4eb870748de3ef85dabd1bd7c9'){throw 'v4 hash mismatch'}
+          $src=Join-Path $env:RUNNER_TEMP 'v5-source'; Expand-Archive $z $src -Force
+          $z5=Join-Path $env:RUNNER_TEMP 'v5patch.zip'; [IO.File]::WriteAllBytes($z5,[Convert]::FromBase64String((Raw 'ci-paint-v5/paint-v5-patch.zip.b64')))
+          if((Get-FileHash $z5 -Algorithm SHA256).Hash.ToLowerInvariant() -ne '3147dc1188d40d0b722f8051fdd6237667bc6971d4c91bb93addcd6b1388a5db'){throw 'v5 patch hash mismatch'}
+          Expand-Archive $z5 $src -Force
+          Compress-Archive -Path (Join-Path $src '*') -DestinationPath (Join-Path $env:RUNNER_TEMP 'paint-v5-source-full.zip') -Force
+          "ZIP=$(Join-Path $env:RUNNER_TEMP 'paint-v5-source-full.zip')" >> $env:GITHUB_ENV
+      - uses: actions/upload-artifact@v4
+        with:
+          name: paint-v5-source-full
+          path: ${{ env.ZIP }}
+          retention-days: 7
