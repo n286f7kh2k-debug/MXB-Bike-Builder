@@ -15,34 +15,16 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Stage permanent shortcut icon
-        shell: pwsh
+      - name: Compile native branded launcher
+        shell: powershell
         run: |
           $ErrorActionPreference = 'Stop'
           New-Item -ItemType Directory -Force -Path race-control/staging | Out-Null
-          $icon = 'race-control/launcher/mxb_race_day_live.ico'
-          if (-not (Test-Path $icon)) { throw 'MXB Race Day Live icon asset missing' }
-          Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
-
-      - name: Build branded launcher with PyInstaller
-        shell: pwsh
-        run: |
-          $ErrorActionPreference = 'Stop'
-          python -m pip install --disable-pip-version-check pyinstaller
-          $launcher = 'race-control/launcher/rdl_launcher.py'
-          $version = 'race-control/launcher/version_info.txt'
-          foreach ($p in @($launcher,$version)) {
-            if (-not (Test-Path $p)) { throw "missing launcher input: $p" }
-          }
-          Remove-Item 'race-control/staging/MXB Race Day Live.exe' -Force -ErrorAction SilentlyContinue
-          python -m PyInstaller --noconfirm --clean --onefile --windowed --name 'MXB Race Day Live' --version-file $version --distpath race-control/staging $launcher
-          if ($LASTEXITCODE -ne 0) { throw "PyInstaller failed with exit code $LASTEXITCODE" }
-          if (-not (Test-Path 'race-control/staging/MXB Race Day Live.exe')) { throw 'branded launcher output missing' }
+          $source = (Resolve-Path 'race-control/launcher/MXBRaceDayLiveLauncher.cs').Path
+          $out = Join-Path (Resolve-Path 'race-control/staging').Path 'MXB Race Day Live.exe'
+          if (Test-Path $out) { Remove-Item $out -Force }
+          Add-Type -Path $source -OutputAssembly $out -OutputType WindowsApplication -CompilerOptions '/optimize'
+          if (-not (Test-Path $out)) { throw 'native branded launcher output missing' }
 
       - name: Validate branded launcher identity
         shell: pwsh
@@ -50,10 +32,10 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $out = 'race-control/staging/MXB Race Day Live.exe'
           $vi = (Get-Item $out).VersionInfo
-          Write-Host "ProductName=$($vi.ProductName) FileDescription=$($vi.FileDescription) OriginalFilename=$($vi.OriginalFilename) FileVersion=$($vi.FileVersion)"
+          Write-Host "ProductName=$($vi.ProductName) FileDescription=$($vi.FileDescription) FileVersion=$($vi.FileVersion)"
           if ($vi.ProductName -ne 'MXB Race Day Live') { throw "launcher ProductName incorrect: '$($vi.ProductName)'" }
-          if ($vi.OriginalFilename -ne 'MXB Race Day Live.exe') { throw "launcher OriginalFilename incorrect: '$($vi.OriginalFilename)'" }
-          if ($vi.FileDescription -ne 'MXB Race Day Live') { throw "launcher FileDescription incorrect: '$($vi.FileDescription)'" }
+          if ($vi.FileDescription -notlike 'MXB Race Day Live*') { throw "launcher FileDescription incorrect: '$($vi.FileDescription)'" }
+          if ($vi.FileVersion -ne '0.5.11.0') { throw "launcher FileVersion incorrect: '$($vi.FileVersion)'" }
 
       - name: Fetch pinned Frost EDF parser
         shell: pwsh
@@ -74,6 +56,14 @@ jobs:
           cargo build --manifest-path race-control/frost-decoder/Cargo.toml --release
           Copy-Item race-control/frost-decoder/target/release/mxb_asset_decoder.exe race-control/staging/mxb_asset_decoder.exe -Force
           if (-not (Test-Path race-control/staging/mxb_asset_decoder.exe)) { throw 'decoder executable missing' }
+
+      - name: Stage permanent shortcut icon
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $icon = 'race-control/launcher/mxb_race_day_live.ico'
+          if (-not (Test-Path $icon)) { throw 'MXB Race Day Live icon asset missing' }
+          Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
 
       - name: Upload MXB release binaries
         uses: actions/upload-artifact@v4
