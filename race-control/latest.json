@@ -1,6 +1,6 @@
 {
-  "version": "0.3.3",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_3_UPDATE.zip",
-  "sha256": "e7cb0e4978ba15ae6d0963383412f161f979dbc8b2084a9972cbf0f1701722c0",
-  "notes": "MXB Race Day Live v0.3.3: turns Race Day Live into an MX Bikes race-day extension with automatic Steam/game detection, a global Launch MX Bikes button, registered-race bike selection backed by the synced MX Bikes bike library, saved per-race bike choices for server enforcement, live race-server readiness, and one-click PiBoSo -directconnect joining. Existing updater/restart, memberships, Community purse/fastest-lap economics, track artwork, live timing, results and admin server controls are preserved."
+  "version": "0.3.4",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_4_UPDATE.zip",
+  "sha256": "4b8c1efa5104eba2b3922d6d823bb52d975c41ec4d9581388d92f465c77da8e9",
+  "notes": "MXB Race Day Live v0.3.4: adds a native Profile > Bikes garage modeled on the MX Bikes Bike Selection screen. It reads the rider\u2019s actual MX Bikes profile and mod folders, cycles the same Bike/Head/Torso/Legs selections, writes the native profile.ini selection fields with a safety backup, uses synced/custom bikes and .pnt gear paints, and keeps race-bike selection aligned. Also assigns a stable Windows AppUserModelID and the Race Day Live icon to the window/taskbar. v0.3.3 one-click game/server launch and all existing updater, membership, wallet, race economics, track media, live timing, results and admin controls are preserved."
 }
