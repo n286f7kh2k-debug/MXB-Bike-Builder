@@ -42,41 +42,29 @@ jobs:
           "SRC=$src" >> $env:GITHUB_ENV
 
       - name: Build self-contained Windows app
-        id: compile
-        continue-on-error: true
         shell: pwsh
         run: |
+          $ErrorActionPreference = 'Stop'
           $proj = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo\MXBRaceDayLive.PaintCreator.Demo.csproj'
           $out = Join-Path $env:RUNNER_TEMP 'paint-v4-publish'
-          $log = Join-Path $env:RUNNER_TEMP 'paint-v4-build.log'
+          dotnet publish $proj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.29 -p:TargetLatestRuntimePatch=false -p:PublishSingleFile=false -o $out
           "OUT=$out" >> $env:GITHUB_ENV
-          "BUILD_LOG=$log" >> $env:GITHUB_ENV
-          dotnet publish $proj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.29 -p:TargetLatestRuntimePatch=false -p:PublishSingleFile=false -o $out *>&1 | Tee-Object -FilePath $log
-          $code = $LASTEXITCODE
-          if ($code -ne 0) { exit $code }
 
-      - name: Upload compiler diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: Paint-Creator-v4-compiler-log
-          path: ${{ env.BUILD_LOG }}
-          retention-days: 7
-
-      - name: Validate Windows build
-        if: always()
+      - name: Inspect and validate publish output
         shell: pwsh
         run: |
-          if ('${{ steps.compile.outcome }}' -ne 'success') { throw 'Windows compile failed. See compiler log artifact.' }
-          $exe = Join-Path $env:OUT 'MXB Race Day Live - Paint Creator.exe'
-          $dll = Join-Path $env:OUT 'MXBRaceDayLive.PaintCreator.dll'
-          if (!(Test-Path $exe)) { throw 'EXE missing' }
-          if (!(Test-Path $dll)) { throw 'Core DLL missing' }
-          Get-ChildItem $env:OUT | Select-Object Name,Length | Format-Table -AutoSize | Out-File (Join-Path $env:OUT 'BUILD_MANIFEST.txt')
-          (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content (Join-Path $env:OUT 'EXE.sha256')
+          $ErrorActionPreference = 'Stop'
+          Write-Host "Publish folder: $env:OUT"
+          Get-ChildItem -LiteralPath $env:OUT | Sort-Object Name | Format-Table Name,Length -AutoSize
+          $exe = Get-ChildItem -LiteralPath $env:OUT -Filter '*.exe' | Where-Object { $_.Name -like '*Paint*Creator*' } | Select-Object -First 1
+          $core = Join-Path $env:OUT 'MXBRaceDayLive.PaintCreator.dll'
+          if ($null -eq $exe) { throw 'Paint Creator EXE missing from publish output.' }
+          if (!(Test-Path -LiteralPath $core)) { throw 'MXBRaceDayLive.PaintCreator.dll missing from publish output.' }
+          Write-Host "Validated EXE: $($exe.FullName)"
+          Get-ChildItem -LiteralPath $env:OUT | Select-Object Name,Length | Format-Table -AutoSize | Out-File (Join-Path $env:OUT 'BUILD_MANIFEST.txt')
+          (Get-FileHash -LiteralPath $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content (Join-Path $env:OUT 'EXE.sha256')
 
       - name: Upload compiled app
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: MXB-Race-Day-Live-Paint-Creator-v4.0.0-win-x64
