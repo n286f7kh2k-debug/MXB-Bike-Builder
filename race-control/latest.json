@@ -1,6 +1,6 @@
 {
-  "version": "0.3.5",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_5_UPDATE.zip",
-  "sha256": "141fdb83b535f188d2af2353009013bc2c64bca588ccd786831b31b8578eba0e",
-  "notes": "MXB Race Day Live v0.3.5: adds Live 3D to Profile > Bikes using the actual MX Bikes rendering engine. Race Day Live generates a PiBoSo testing-mode config from the current garage selection, launches a dedicated windowed mxbikes.exe preview instance, and embeds that real render window inside the app with Win32 window hosting. Bike/paint/rider/helmet/boots/gloves selection changes can refresh the native preview. The user\u2019s mxbikes.ini is backed up before temporary preview resolution/window-mode changes and restored when the preview closes. v0.3.4 native profile selection and taskbar icon, v0.3.3 one-click race joining, updater/restart, memberships, wallet, race economics, track media, live timing, results and admin controls are preserved."
+  "version": "0.3.6",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_3_6_UPDATE.zip",
+  "sha256": "82386b5bb0972fe87082e77a00c97030b39ee0b99c2887dd61f871824026b7b6",
+  "notes": "MXB Race Day Live v0.3.6: moves bike/kit selection into a dedicated top-level GARAGE and keeps every installed MX Bikes bike compatible, including EDF-only bikes, by running the MX Bikes testing renderer as a hidden backend and attaching only its render surface inside Race Day Live. No separate game window is shown for Garage preview. Also completes a whole-app performance pass: cached MX content/paint/model scans, cached Steam/game discovery, cached resized profile/track images and track-media lookups, same-page navigation short-circuiting, Garage-only renderer lifecycle, and an in-place one-second LIVE timing/commentary refresh instead of destroying/recreating the tower every second. Existing updater/restart, taskbar logo, one-click race joining, memberships, wallet, race economics, track artwork, results and admin controls are preserved."
 }
