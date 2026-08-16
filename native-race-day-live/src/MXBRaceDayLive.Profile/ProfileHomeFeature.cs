@@ -268,9 +268,10 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         });
 
         var avatar = new Grid { Width = 94, Height = 94, HorizontalAlignment = HorizontalAlignment.Left, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(22,0,0,19) };
-        var avatarFill = TryImageBrush(rider.AvatarPath) ?? new LinearGradientBrush(Color("#0D3551"), Color("#06131F"), 45);
+        var avatarImageBrush = TryImageBrush(rider.AvatarPath);
+        Brush avatarFill = (Brush?)avatarImageBrush ?? new LinearGradientBrush(Color("#0D3551"), Color("#06131F"), 45);
         avatar.Children.Add(new Ellipse { Fill = avatarFill, Stroke = Brush("#E8F7FF"), StrokeThickness = 3, Effect = Glow("#00A8FF", 18, 0.50) });
-        if (TryImageBrush(rider.AvatarPath) is null)
+        if (avatarImageBrush is null)
             avatar.Children.Add(new TextBlock { Text = Initials(rider.DisplayName), Foreground = Brushes.White, FontFamily = new FontFamily("Segoe UI Black"), FontSize = 26, HorizontalAlignment = HorizontalAlignment.Center, VerticalAlignment = VerticalAlignment.Center });
         hero.Children.Add(avatar);
 
