@@ -1,0 +1,30 @@
+name: Restore v1.0.16 Theme Only
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/scripts/restore_v1016_theme_only.py'
+      - '.github/workflows/restore-v1016-theme-only.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  restore:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+          fetch-depth: 0
+      - name: Restore original layout and apply theme-only changes
+        run: python .github/scripts/restore_v1016_theme_only.py
+      - name: Commit v1.0.16 correction
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          git commit -m "Restore existing layout and apply theme-only image treatment v1.0.16"
+          git push origin native-rebuild
