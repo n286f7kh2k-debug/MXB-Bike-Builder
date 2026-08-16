@@ -15,6 +15,10 @@ Fresh native Windows rebuild. The previous Python-hosted application is intentio
 - Frost/public MXB format research retained as a reference for future asset, gear and 3D tooling
 - Add larger features back one at a time only after the current layer is stable
 
+## Theme direction
+
+The existing UI uses a race-night game-menu treatment: darker layered backgrounds, electric-blue accents, compact glowing borders, stronger hierarchy, and more aggressive motocross-style typography. Theme passes must restyle existing screens without adding product sections or functionality unless explicitly requested.
+
 ## First checkpoint
 
 The first checkpoint intentionally contains only the native shell, profile-card home feature, persistent rider profile, MX Bikes environment/profile detection, Launch MX Bikes, and the live feature updater. Larger race-day systems are being added back one at a time after the native foundation is validated.
