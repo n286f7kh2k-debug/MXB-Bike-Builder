@@ -17,5 +17,6 @@
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../MXBRaceDayLive.Contracts/MXBRaceDayLive.Contracts.csproj" />
+    <Resource Include="../../../race-control/launcher/mxb_race_day_live.ico" Link="Assets/mxb_race_day_live.ico" />
   </ItemGroup>
 </Project>
