@@ -10,6 +10,8 @@ Set-Content -LiteralPath `$adapter -Value `$adapterText -Encoding utf8
 "@
 if(-not $source.Contains($needle)){throw 'Could not locate v6 patch insertion point.'}
 $source=$source.Replace($needle,$needle+"`r`n"+$insert)
+$source=$source.Replace("using MXBRaceDayLive.PaintCreator.Contracts;`nusing MXBRaceDayLive.PaintCreator.Demo;","using System.IO;`nusing MXBRaceDayLive.PaintCreator.Contracts;`nusing MXBRaceDayLive.PaintCreator.Demo;")
+$source=$source.Replace("'using MXBRaceDayLive.PaintCreator.Models;using MXBRaceDayLive.PaintCreator.Services;","'using System.IO;using MXBRaceDayLive.PaintCreator.Models;using MXBRaceDayLive.PaintCreator.Services;")
 $patched=Join-Path $env:RUNNER_TEMP 'build-v6-fixed.ps1'
 Set-Content -LiteralPath $patched -Value $source -Encoding utf8
 & $patched
