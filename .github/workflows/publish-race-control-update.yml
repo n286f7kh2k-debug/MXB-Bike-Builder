@@ -36,11 +36,39 @@ jobs:
           Copy-Item race-control/frost-decoder/target/release/mxb_asset_decoder.exe race-control/staging/mxb_asset_decoder.exe -Force
           if (-not (Test-Path race-control/staging/mxb_asset_decoder.exe)) { throw 'decoder executable missing' }
 
-      - name: Upload MXB decoder
+      - name: Build branded MXB Race Day Live launcher
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $base = 'race-control/releases/MXB_Race_Day_Live_v0_5_10_UPDATE.zip'
+          if (-not (Test-Path $base)) { throw 'v0.5.10 base release missing' }
+          $temp = Join-Path $env:RUNNER_TEMP 'mxb-rdl-launcher-base'
+          Remove-Item $temp -Recurse -Force -ErrorAction SilentlyContinue
+          Expand-Archive -Path $base -DestinationPath $temp -Force
+          $icon = Join-Path $temp 'assets/mxb_race_day_live.ico'
+          if (-not (Test-Path $icon)) { throw 'MXB Race Day Live icon missing from base release' }
+          $source = 'race-control/launcher/MXBRaceDayLiveLauncher.cs'
+          if (-not (Test-Path $source)) { throw 'launcher source missing' }
+          $out = 'race-control/staging/MXB Race Day Live.exe'
+          $candidates = @(
+            "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
+            "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
+          )
+          $csc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $csc) { throw 'C# compiler not found on Windows runner' }
+          & $csc /nologo /target:winexe /optimize+ /platform:anycpu "/win32icon:$icon" "/out:$out" $source
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path $out)) { throw 'branded launcher build failed' }
+          $vi = (Get-Item $out).VersionInfo
+          if ($vi.ProductName -ne 'MXB Race Day Live') { throw "launcher product identity incorrect: $($vi.ProductName)" }
+          Write-Host "Launcher: $($vi.ProductName) $($vi.FileVersion)"
+
+      - name: Upload MXB release binaries
         uses: actions/upload-artifact@v4
         with:
-          name: mxb-asset-decoder
-          path: race-control/staging/mxb_asset_decoder.exe
+          name: mxb-release-binaries
+          path: |
+            race-control/staging/mxb_asset_decoder.exe
+            race-control/staging/MXB Race Day Live.exe
           if-no-files-found: error
 
   publish:
@@ -50,10 +78,10 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Download MXB decoder
+      - name: Download MXB release binaries
         uses: actions/download-artifact@v4
         with:
-          name: mxb-asset-decoder
+          name: mxb-release-binaries
           path: race-control/staging
 
       - name: Assemble Race Control release
