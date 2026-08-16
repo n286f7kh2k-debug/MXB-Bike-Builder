@@ -24,20 +24,11 @@ jobs:
           $ErrorActionPreference = 'Stop'
           $viewerPath = 'native-race-day-live/src/MXBRaceDayLive.Profile/BikeModelViewer.cs'
           $viewer = Get-Content $viewerPath -Raw
-          $old = @'
-        var bundle = await Task.Run(() => ResolveBundle(bike), cancellationToken);
-        var decoder = await EnsureDecoderAsync(cancellationToken);
-'@
-          $new = @'
-        var bundle = await Task.Run(() => ResolveBundle(bike), cancellationToken);
-        if (FrostBikePreviewProvider.RequiresFrost(bundle.EdfFiles))
-            return await FrostBikePreviewProvider.CreateAsync(bike, bundle.SourcePath, cancellationToken);
-
-        var decoder = await EnsureDecoderAsync(cancellationToken);
-'@
-          if (-not $viewer.Contains($old)) { throw 'BikeModelViewer CreateAsync insertion point was not found' }
-          $viewer = $viewer.Replace($old, $new)
-          [System.IO.File]::WriteAllText((Resolve-Path $viewerPath), $viewer)
+          $pattern = 'var bundle = await Task\.Run\(\(\) => ResolveBundle\(bike\), cancellationToken\);\r?\n\s*var decoder = await EnsureDecoderAsync\(cancellationToken\);'
+          $replacement = "var bundle = await Task.Run(() => ResolveBundle(bike), cancellationToken);`n        if (FrostBikePreviewProvider.RequiresFrost(bundle.EdfFiles))`n            return await FrostBikePreviewProvider.CreateAsync(bike, bundle.SourcePath, cancellationToken);`n`n        var decoder = await EnsureDecoderAsync(cancellationToken);"
+          $updated = [regex]::Replace($viewer, $pattern, $replacement, 1)
+          if ($updated -eq $viewer) { throw 'BikeModelViewer CreateAsync insertion point was not found' }
+          [System.IO.File]::WriteAllText((Resolve-Path $viewerPath), $updated)
 
       - name: Bump profile module and add UI Automation references
         shell: pwsh
@@ -47,13 +38,8 @@ jobs:
           $project = Get-Content $projectPath -Raw
           $project = $project.Replace('<Version>1.0.6</Version>', '<Version>1.0.7</Version>')
           if ($project -notmatch 'UIAutomationClient') {
-            $refs = @'
-  <ItemGroup>
-    <Reference Include="UIAutomationClient" />
-    <Reference Include="UIAutomationTypes" />
-  </ItemGroup>
-'@
-            $project = $project.Replace('</Project>', "$refs</Project>")
+            $refs = "  <ItemGroup>`n    <Reference Include=`"UIAutomationClient`" />`n    <Reference Include=`"UIAutomationTypes`" />`n  </ItemGroup>`n"
+            $project = $project.Replace('</Project>', $refs + '</Project>')
           }
           if ($project -notmatch '<Version>1\.0\.7</Version>') { throw 'Profile version did not bump to 1.0.7' }
           [System.IO.File]::WriteAllText((Resolve-Path $projectPath), $project)
