@@ -1,0 +1,141 @@
+name: Repair Theme Art Resource
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/repair-theme-art.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout native rebuild
+        uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+
+      - name: Repair malformed Base64 and create real JPG resource
+        shell: python
+        run: |
+          from pathlib import Path
+          import base64, re, hashlib
+
+          root = Path('native-race-day-live/src/MXBRaceDayLive.Profile')
+          source_path = root / 'ThemeArt.cs'
+          source = source_path.read_text(encoding='utf-8')
+
+          m = re.search(r'HeaderImage\s*=\s*Load\(@"([^"]+)"\)', source, re.S)
+          if not m:
+              raise SystemExit('Could not locate existing ThemeArt Base64 payload')
+
+          raw = m.group(1)
+          allowed = set('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
+          invalid = [(i, ch, ord(ch)) for i, ch in enumerate(raw) if ch not in allowed and not ch.isspace()]
+          print(f'Original payload chars: {len(raw)}')
+          print(f'Invalid non-whitespace chars: {len(invalid)}')
+          if invalid:
+              print('First invalid chars:', invalid[:20])
+
+          clean = ''.join(ch for ch in raw if ch in allowed)
+          # Padding is only legal at the end. Remove stray padding and restore canonical padding.
+          clean = clean.replace('=', '')
+          clean += '=' * ((4 - len(clean) % 4) % 4)
+          try:
+              image = base64.b64decode(clean, validate=True)
+          except Exception as exc:
+              raise SystemExit(f'Repaired Base64 still cannot decode: {exc}')
+
+          print(f'Decoded bytes: {len(image)}')
+          print('SHA256:', hashlib.sha256(image).hexdigest())
+          if len(image) < 10000:
+              raise SystemExit('Decoded image is unexpectedly small')
+          if not image.startswith(b'\xff\xd8\xff'):
+              raise SystemExit('Decoded asset is not a JPEG')
+          if not image.rstrip().endswith(b'\xff\xd9'):
+              raise SystemExit('Decoded JPEG does not have an EOI marker')
+
+          asset_dir = root / 'Assets'
+          asset_dir.mkdir(parents=True, exist_ok=True)
+          asset_path = asset_dir / 'reference-header.jpg'
+          asset_path.write_bytes(image)
+
+          source_path.write_text('''using System.IO;
+          using System.Windows;
+          using System.Windows.Media;
+          using System.Windows.Media.Imaging;
+
+          namespace MXBRaceDayLive.Profile;
+
+          internal static class ThemeArt
+          {
+              private const string ResourceName = "MXBRaceDayLive.Profile.Assets.reference-header.jpg";
+              private static readonly Lazy<ImageSource> HeaderImage = new(LoadImage, LazyThreadSafetyMode.ExecutionAndPublication);
+
+              public static ImageBrush HeaderBrush() => NewBrush(new Rect(0.00, 0.00, 1.00, 1.00));
+              public static ImageBrush RiderBrush() => NewBrush(new Rect(0.25, 0.00, 0.45, 1.00));
+              public static ImageBrush LiveBrush() => NewBrush(new Rect(0.57, 0.00, 0.43, 1.00));
+              public static ImageBrush LogoBrush() => NewBrush(new Rect(0.00, 0.00, 0.38, 1.00));
+
+              private static ImageBrush NewBrush(Rect viewbox)
+              {
+                  var brush = new ImageBrush(HeaderImage.Value)
+                  {
+                      Stretch = Stretch.UniformToFill,
+                      AlignmentX = AlignmentX.Center,
+                      AlignmentY = AlignmentY.Center,
+                      ViewboxUnits = BrushMappingMode.RelativeToBoundingBox,
+                      Viewbox = viewbox
+                  };
+                  brush.Freeze();
+                  return brush;
+              }
+
+              private static ImageSource LoadImage()
+              {
+                  using var stream = typeof(ThemeArt).Assembly.GetManifestResourceStream(ResourceName)
+                      ?? throw new InvalidOperationException($"Theme image resource was not found: {ResourceName}");
+                  var bitmap = new BitmapImage();
+                  bitmap.BeginInit();
+                  bitmap.CacheOption = BitmapCacheOption.OnLoad;
+                  bitmap.StreamSource = stream;
+                  bitmap.EndInit();
+                  bitmap.Freeze();
+                  return bitmap;
+              }
+          }
+          '''.replace('          ', ''), encoding='utf-8')
+
+          project_path = root / 'MXBRaceDayLive.Profile.csproj'
+          project = project_path.read_text(encoding='utf-8')
+          project = re.sub(r'<Version>[^<]+</Version>', '<Version>1.0.19</Version>', project, count=1)
+          if 'Assets\\reference-header.jpg' not in project and 'Assets/reference-header.jpg' not in project:
+              marker = '  <ItemGroup>\n    <ProjectReference Include="../MXBRaceDayLive.Contracts/MXBRaceDayLive.Contracts.csproj" />\n  </ItemGroup>'
+              replacement = marker + '\n  <ItemGroup>\n    <EmbeddedResource Include="Assets\\reference-header.jpg" />\n  </ItemGroup>'
+              if marker not in project:
+                  raise SystemExit('Could not find project ItemGroup insertion point')
+              project = project.replace(marker, replacement, 1)
+          project_path.write_text(project, encoding='utf-8')
+
+      - name: Verify repaired files
+        shell: bash
+        run: |
+          test -s native-race-day-live/src/MXBRaceDayLive.Profile/Assets/reference-header.jpg
+          grep -q '<Version>1.0.19</Version>' native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          grep -q 'EmbeddedResource' native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          grep -q 'GetManifestResourceStream' native-race-day-live/src/MXBRaceDayLive.Profile/ThemeArt.cs
+
+      - name: Commit repaired theme asset
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ThemeArt.cs \
+                  native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj \
+                  native-race-day-live/src/MXBRaceDayLive.Profile/Assets/reference-header.jpg
+          git commit -m 'Fix theme image runtime crash and bump profile v1.0.19'
+          git push origin HEAD:native-rebuild
