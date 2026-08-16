@@ -1,7 +1,6 @@
 {
   "version": "0.3.5",
   "filename": "MXB_Race_Day_Live_v0_3_5_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.3.5: adds Live 3D to Profile > Bikes using the actual MX Bikes rendering engine. Race Day Live generates a PiBoSo testing-mode config from the current garage selection, launches a dedicated windowed mxbikes.exe preview instance, embeds its render window inside the app, and refreshes it as bike/paint/kit selections change. The user’s MX Bikes graphics settings are backed up and restored automatically. Existing Profile Bikes functionality, taskbar logo, one-click server joining, updater/restart, memberships, wallet, race economics, track media, live timing, results and admin controls are preserved.",
-  "builder_script": "race-control/build_v035_native_3d_fixed.py",
-  "rebuild_attempt": 2
+  "notes": "Inspection only for Garage/performance refactor; no release publication.",
+  "builder_script": "race-control/inspect_v035_layout.py"
 }
