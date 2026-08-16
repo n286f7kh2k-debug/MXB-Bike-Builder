@@ -1,0 +1,34 @@
+name: Fix v1.0.13 WPF Theme
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/fix-v1013-wpf-theme.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+      - name: Remove unsupported WPF text property
+        shell: pwsh
+        run: |
+          $path = 'native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs'
+          $text = Get-Content $path -Raw
+          $text = $text.Replace("            FontSize = 44,`r`n            CharacterSpacing = -25`r`n", "            FontSize = 44`r`n")
+          $text = $text.Replace("            FontSize = 44,`n            CharacterSpacing = -25`n", "            FontSize = 44`n")
+          Set-Content $path $text -NoNewline
+      - name: Commit WPF-safe theme
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
+          git commit -m "Make race-night theme WPF compatible"
+          git push origin native-rebuild
