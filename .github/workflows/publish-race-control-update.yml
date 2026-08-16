@@ -15,6 +15,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Prepare branded launcher icon
         shell: pwsh
         run: |
@@ -24,18 +29,29 @@ jobs:
           if (-not (Test-Path $icon)) { throw 'MXB Race Day Live launcher icon asset missing' }
           Copy-Item $icon 'race-control/staging/rdl-launcher.ico' -Force
           if (-not (Test-Path 'race-control/staging/rdl-launcher.ico')) { throw 'launcher icon staging failed' }
-          Write-Host "Launcher icon source: $icon"
 
-      - name: Compile branded launcher
+      - name: Build branded launcher with PyInstaller
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $source = 'race-control/launcher/MXBRaceDayLiveLauncher.cs'
+          python -m pip install --disable-pip-version-check pyinstaller
+          $launcher = 'race-control/launcher/rdl_launcher.py'
+          $version = 'race-control/launcher/version_info.txt'
+          $icon = 'race-control/launcher/mxb_race_day_live.ico'
+          foreach ($p in @($launcher,$version,$icon)) { if (-not (Test-Path $p)) { throw "missing launcher input: $p" } }
+          python -m PyInstaller `
+            --noconfirm `
+            --clean `
+            --onefile `
+            --windowed `
+            --name 'MXB Race Day Live' `
+            --icon $icon `
+            --version-file $version `
+            --distpath race-control/staging `
+            --workpath race-control/staging/pyi-work `
+            --specpath race-control/staging/pyi-spec `
+            $launcher
           $out = 'race-control/staging/MXB Race Day Live.exe'
-          if (-not (Test-Path $source)) { throw 'launcher source missing' }
-          Remove-Item $out -Force -ErrorAction SilentlyContinue
-          $code = Get-Content $source -Raw
-          Add-Type -TypeDefinition $code -Language CSharp -OutputAssembly $out -OutputType WindowsApplication
           if (-not (Test-Path $out)) { throw 'branded launcher output missing' }
 
       - name: Validate branded launcher identity
@@ -46,7 +62,8 @@ jobs:
           $vi = (Get-Item $out).VersionInfo
           Write-Host "ProductName=$($vi.ProductName) FileDescription=$($vi.FileDescription) FileVersion=$($vi.FileVersion)"
           if ($vi.ProductName -ne 'MXB Race Day Live') { throw "launcher ProductName incorrect: '$($vi.ProductName)'" }
-          if ($vi.FileDescription -notlike 'MXB Race Day Live*') { throw "launcher FileDescription incorrect: '$($vi.FileDescription)'" }
+          if ($vi.OriginalFilename -ne 'MXB Race Day Live.exe') { throw "launcher OriginalFilename incorrect: '$($vi.OriginalFilename)'" }
+          if ($vi.FileDescription -ne 'MXB Race Day Live') { throw "launcher FileDescription incorrect: '$($vi.FileDescription)'" }
 
       - name: Fetch pinned Frost EDF parser
         shell: pwsh
