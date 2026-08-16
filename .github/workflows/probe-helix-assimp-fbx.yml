@@ -26,7 +26,7 @@ jobs:
           if ($null -eq $fbx) { throw 'Official rider FBX not found' }
           "PROBE_ROOT=$root" >> $env:GITHUB_ENV
           "RIDER_FBX=$($fbx.FullName)" >> $env:GITHUB_ENV
-      - name: Create .NET reflection/import probe
+      - name: Create .NET importer probe
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -34,17 +34,14 @@ jobs:
           dotnet new console -n Probe -o $proj -f net8.0
           Push-Location $proj
           dotnet add package HelixToolkit.SharpDX.Assimp --version 3.1.2
-          dotnet add package HelixToolkit.Wpf.SharpDX --version 3.1.2
           @'
           using System.Reflection;
-          using System.Runtime.Loader;
 
           var fbx = Environment.GetEnvironmentVariable("RIDER_FBX")!;
           var assimpAsm = AppDomain.CurrentDomain.GetAssemblies().FirstOrDefault(a => a.GetName().Name == "HelixToolkit.SharpDX.Assimp")
               ?? Assembly.Load("HelixToolkit.SharpDX.Assimp");
           Console.WriteLine($"ASSEMBLY {assimpAsm.FullName}");
-          var types = assimpAsm.GetTypes().Where(t => t.Name.Contains("Importer", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Scene", StringComparison.OrdinalIgnoreCase)).OrderBy(t => t.FullName).ToList();
-          foreach (var t in types)
+          foreach (var t in assimpAsm.GetTypes().Where(t => t.Name.Contains("Importer", StringComparison.OrdinalIgnoreCase) || t.Name.Contains("Scene", StringComparison.OrdinalIgnoreCase)).OrderBy(t => t.FullName))
           {
               Console.WriteLine($"TYPE {t.FullName}");
               foreach (var m in t.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly).Where(m => m.Name.Contains("Load", StringComparison.OrdinalIgnoreCase) || m.Name.Contains("Import", StringComparison.OrdinalIgnoreCase)))
@@ -60,17 +57,15 @@ jobs:
           });
           if (load is null) throw new Exception("String Load overload not found");
           Console.WriteLine("SELECTED " + load);
-          var args = load.GetParameters().Select((p,i) => i == 0 ? (object?)fbx : (p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null))).ToArray();
-          var scene = load.Invoke(importer, args);
+          var callArgs = load.GetParameters().Select((p,i) => i == 0 ? (object?)fbx : (p.HasDefaultValue ? p.DefaultValue : (p.ParameterType.IsValueType ? Activator.CreateInstance(p.ParameterType) : null))).ToArray();
+          var scene = load.Invoke(importer, callArgs);
           Console.WriteLine("LOAD_RESULT " + (scene?.GetType().FullName ?? "null"));
           if (scene is null) throw new Exception("FBX load returned null");
           foreach (var prop in scene.GetType().GetProperties(BindingFlags.Public|BindingFlags.Instance))
           {
-              if (prop.Name.Contains("Root", StringComparison.OrdinalIgnoreCase) || prop.Name.Contains("Node", StringComparison.OrdinalIgnoreCase) || prop.Name.Contains("Anim", StringComparison.OrdinalIgnoreCase))
-              {
-                  object? value = null; try { value = prop.GetValue(scene); } catch { }
-                  Console.WriteLine($"SCENE_PROP {prop.Name}={value?.GetType().FullName ?? "null"}");
-              }
+              object? value = null;
+              try { value = prop.GetValue(scene); } catch { }
+              Console.WriteLine($"SCENE_PROP {prop.Name} TYPE={prop.PropertyType.FullName} VALUE_TYPE={value?.GetType().FullName ?? "null"}");
           }
           '@ | Set-Content -LiteralPath (Join-Path $proj 'Program.cs')
           dotnet run -c Release *>&1 | Tee-Object -FilePath (Join-Path $env:PROBE_ROOT 'probe.log')
