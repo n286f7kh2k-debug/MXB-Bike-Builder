@@ -3,5 +3,5 @@
   "filename": "MXB_Race_Day_Live_v0_5_11_UPDATE.zip",
   "notes": "MXB Race Day Live v0.5.11 fixes the Garage black-box/loading-error loop and Windows pinned-taskbar identity. Stock bike geometry is now resolved directly from the game install bikes.pkz as well as loose/mod sources; repeated resize/error requests are deduplicated; the viewer no longer wipes itself before async loads and shows a persistent diagnostic instead of a black box when an actual asset cannot be decoded. Rider rendering keeps the real rider body visible if an optional helmet, boots or protection package is unreadable. Windows no longer uses a renamed pythonw.exe as the app launcher: a native MXB Race Day Live executable with MXB Race Day Live Windows metadata is installed, desktop and existing pinned links are migrated to it without obsolete app.py shortcut arguments, the branded icon remains assigned through the app shortcut/taskbar integration, and the stable MXBRaceDayLive.Desktop identity remains. Protected/non-ZIP creator packages remain protected and are not cracked or replaced with fake geometry.",
   "builder_script": "race-control/build_v0511_viewer_taskbar.py",
-  "build_attempt": 12
+  "build_attempt": 13
 }
