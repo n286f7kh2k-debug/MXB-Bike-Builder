@@ -1,0 +1,1980 @@
+VERSION 0.5.0 CURRENT UI INSPECTION
+
+
+===== PROFILE =====
+--- needle: def page_profile @ 22696 ---
+e,Image.Resampling.LANCZOS)
+                canvas=Image.new('RGB',size,(21,25,30)); x=(size[0]-im.width)//2; y=(size[1]-im.height)//2; canvas.paste(im,(x,y))
+                photo=ImageTk.PhotoImage(canvas)
+            self._photo_cache[key]=photo
+            while len(self._photo_cache)>96:self._photo_cache.pop(next(iter(self._photo_cache)))
+            return photo
+        except Exception:return None
+
+    def _track_photo(self,parent,discipline,track,size=(330,186),on_click=None,on_resolved=None):
+        wrap=tk.Frame(parent,bg='#0f1216',width=size[0],height=size[1],highlightbackground=LINE,highlightthickness=1)
+        wrap.pack_propagate(False)
+        label=tk.Label(wrap,text='MXB-SHOP TRACK PHOTO\nLOADING…',fg=MUTED,bg='#0f1216',font=('Segoe UI Semibold',9),justify='center')
+        label.pack(fill='both',expand=True)
+        if on_click:
+            label.configure(cursor='hand2'); label.bind('<Button-1>',lambda e:on_click())
+        media_key=(str(discipline).upper(),str(track))
+        def apply(media):
+            self._track_media_mem[media_key]=media
+            try:
+                if not label.winfo_exists(): return
+            except Exception:
+                return
+            photo=self._load_track_tk(media.local_path,size)
+            if photo:
+                label.configure(image=photo,text='')
+            elif media.status in ('ERROR','NOT_FOUND'):
+                label.configure(text='MXB-SHOP TRACK PHOTO\nSOURCE RETRY AVAILABLE',fg=GOLD)
+            if on_resolved:
+                try:on_resolved(media)
+                except Exception:pass
+        cached=self._track_media_mem.get(media_key)
+        if cached is None:
+            cached=self.track_media.get_cached(discipline,track); self._track_media_mem[media_key]=cached
+        if cached.status=='READY' and cached.local_path and Path(cached.local_path).exists():
+            apply(cached)
+        else:
+            self.track_media.resolve_async(discipline,track,callback=lambda m:self.after(0,lambda:apply(m)))
+        return wrap
+
+    def _start_mx_sync(self):
+        if self._mx_sync_started:
+            return
+        self._mx_sync_started=True
+        self._run_mx_sync()
+
+    def _run_mx_sync(self):
+        if not self.winfo_exists(): return
+        try:
+            self.mx_status_label.configure(text='● SYNCING MX BIKES…',fg=GOLD)
+        except Exception:
+            pass
+        def done(env):
+            try:self.after(0,lambda:self._apply_mx_environment(env))
+            except Exception:pass
+        self.mx_agent.sync_async(done)
+        try:
+            interval=int(self.conn.execute("SELECT value FROM admin_settings WHERE key='mx_sync_interval_seconds'").fetchone()[0])
+        except Exception:
+            interval=60
+        self.after(max(20,interval)*1000,self._run_mx_sync)
+
+    def _apply_mx_environment(self,env):
+        try:
+            self.bike_garage.invalidate_cache()
+            self.game_bridge.invalidate_cache()
+            if env.found:
+                self.mx_status_label.configure(text='● MX BIKES CONNECTED',fg=GREEN)
+                self.mx_counts_label.configure(text=f"{env.tracks_found} tracks • {env.bikes_found} bikes\nProfile: {env.profile_name or 'detected'}")
+            else:
+                self.mx_status_label.configure(text='● MX BIKES NOT FOUND',fg=RED)
+                self.mx_counts_label.configure(text=env.error or 'Install path not detected')
+        except Exception:pass
+
+    def _garage_sync_now(self):
+        try:self.mx_status_label.configure(text='● SYNCING MX BIKES…',fg=GOLD)
+        except Exception:pass
+        def done(env):
+            def ui():
+                self._apply_mx_environment(env)
+                if getattr(self,'current_page','')=='GARAGE':self.show('GARAGE',force=True)
+            try:self.after(0,ui)
+            except Exception:pass
+        self.mx_agent.sync_async(done)
+
+    def _apply_windows_taskbar_icon(self):
+        try:
+            return apply_taskbar_identity(self,self._taskbar_icon_path,APP_USER_MODEL_ID)
+        except Exception:
+            return False
+
+    def _on_close(self):
+        try:
+            if self.mx_agent.live_client:self.mx_agent.live_client.stop()
+        except Exception:
+            pass
+        try:self.announcer.stop()
+        except Exception:pass
+        try:self.conn.close()
+        except Exception:pass
+        try:release_taskbar_icons()
+        except Exception:pass
+        self.destroy()
+
+    # ---------- RIDER PROFILE ----------
+    def page_profile(self):
+        r=self.rider(); self._profile_header(r); self._profile_subnav()
+        if self.profile_section=='RACES':return self._profile_my_races(r)
+        if self.profile_section=='WALLET':return self._profile_wallet(r)
+        if self.profile_section=='MEMBERSHIP':return self._profile_membership(r)
+        if self.profile_section=='SETTINGS':return self._profile_settings(r)
+        return self._profile_overview(r)
+
+    def _profile_overview(self,r):
+        top=tk.Frame(self.content,bg=BG); top.pack(fill='x',padx=23)
+        self.stat(top,'WALLET',f"${wallet_balance(self.conn,r['id']):,.2f}",True)
+        self.stat(top,'CAREER STARTS',f"{r['starts']}")
+        self.stat(top,'WINS / PODIUMS',f"{r['wins']} / {r['podiums']}")
+        self.stat(top,'CHAMPIONSHIPS',f"{r['championships']}")
+        self.stat(top,'CAREER EARNINGS',f"${r['career_earnings']:,.0f}",True)
+        body=tk.Frame(self.content,bg=BG); body.pack(fill='both',expand=True,padx=28,pady=16)
+        left=tk.Frame(body,bg=BG); left.pack(side='left',fill='both',expand=True,padx=(0,7))
+        right=tk.Frame(body,bg=BG); right.pack(side='left',fill='both',expand=True,padx=(7,0))
+
+        nextcard=self.card(left); nextcard.pack(fill='x')
+        tk.Label(nextcard,text='UPCOMING RACES',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        eligible=[x for x in self.conn.execute("SELECT * FROM races WHERE status='REGISTRATION' ORDER BY entry_fee,start_time") if self.eligible(x,r)]
+        for race in eligible[:3]:
+            paid,purse=current_purse(self.conn,race['id']); fast=fastest_lap_pool(self.conn,race['id'])
+            f=tk.Frame(nextcard,bg=PANEL2); f.pack(fill='x',padx=14,pady=4)
+            tk.Label(f,text=f"{self.race_class_label(race)}  •  {race['track']}",fg=ACCENT,bg=PANEL2,font=('Segoe UI Black',9)).pack(anchor='w',padx=10,pady=(9,1))
+            tk.Label(f,text=race['name'],fg=TEXT,bg=PANEL2,font=('Segoe UI Black',12)).pack(anchor='w',padx=10)
+            tk.Label(f,text=f"${race['entry_fee']:.2f} entry  •  ${purse:,.0f} purse  •  ${fast:,.0f} fastest lap",fg=MUTED,bg=PANEL2,font=('Segoe UI',9)).pack(anchor='w',padx=10,pady=(2,9))
+            self._bind_click_recursive(f,lambda rid=race['id']:self.open_race_details(rid))
+        if not eligible: tk.Label(nextcard,text='No eligible races are open right now.',fg=MUTED,bg=PANEL,font=('Segoe UI',10)).pack(anchor='w',padx=16,pady=(2,14))
+        tk.Button(nextcard,text='FIND A RACE',command=lambda:self.show('UPCOMING'),bg=ACCENT,fg='white',relief='flat',font=('Segoe UI Black',10),pady=9,cursor='hand2').pack(fill='x',padx=14,pady=(10,14))
+
+        about=self.card(left); about.pack(fill='x',pady=(12,0))
+        tk.Label(about,text='RIDER CARD',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,5))
+        tk.Label(about,text=r['bio'] or 'No bio yet. Add one in Profile Settings.',fg=TEXT,bg=PANEL,font=('Segoe UI',10),wraplength=540,justify='left').pack(anchor='w',padx=16,pady=(0,8))
+        for lab,val in [('HOMETOWN',r['hometown'] or '—'),('FAVORITE TRACK',r['favorite_track'] or '—'),('SOCIAL',r['social_link'] or '—')]:
+            tk.Label(about,text=f'{lab}:  {val}',fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',9)).pack(anchor='w',padx=16,pady=2)
+        tk.Button(about,text='CUSTOMIZE PROFILE',command=lambda:self._set_profile_section('SETTINGS'),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),pady=8,cursor='hand2').pack(fill='x',padx=14,pady=14)
+
+        hist=self.card(right); hist.pack(fill='both',expand=True)
+        tk.Label(hist,text='RECENT RESULTS',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        rows=list(self.conn.execute('''SELECT rs.position,rs.payout,rs.fast_lap_bonus,rs.skill_delta,rc.name,rc.track FROM results rs JOIN races rc ON rc.id=rs.race_id WHERE rs.rider_id=? ORDER BY rc.start_time DESC LIMIT 6''',(r['id'],)))
+        if not rows: tk.Label(hist,text='Completed race results will appear here automatically after MX Bikes sync.',fg=MUTED,bg=PANEL,font=('Segoe UI',10),wraplength=540,justify='left').pack(anchor='w',padx=16,pady=12)
+        for x in rows:
+            f=tk.Frame(hist,bg=PANEL2); f.pack(fill='x',padx=14,pady=4)
+            tk.Label(f,text=f"P{x['position']}  {x['name']}",fg=TEXT,bg=PANEL2,font=('Segoe UI Semibold',10)).pack(anchor='w',padx=10,pady=(8,1))
+            bonus=f"  •  +${x['fast_lap_bonus']:.0f} FAST LAP" if x['fast_lap_bon
+
+--- needle: MY PROFILE @ 1762 ---
+import os, shutil, threading, tkinter as tk, webbrowser, re
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
+from datetime import datetime
+from .config import VERSION, APP_NAME, APPDATA, load_settings
+from .database import (
+    connect, seed, current_purse, payout_split, fastest_lap_pool,
+    race_financials, wallet_balance, wallet_credit, wallet_debit, wallet_statement,
+    register_with_wallet, setting_float
+)
+from .updater import check_for_update, download_update, launch_update
+from .mx_agent import MXRaceAgent
+from .game_bridge import MXGameBridge, GameBridgeError, ensure_game_bridge_schema
+from .bike_garage import MXBikeGarage, BikeGarageError
+from .windows_taskbar import apply_taskbar_identity, release_taskbar_icons
+from .in_app_garage import InAppGarageRenderer, GarageModelError
+from .track_media import TrackMediaResolver
+from .pricing import apply_low_entry_pricing
+from .subscriptions import (PLANS, ensure_subscription_schema, get_subscription, usage_today, member_quote,
+                            record_member_use, activate_demo_subscription, cancel_auto_renew,
+                            admin_membership_metrics)
+from .commentary import CommentaryDirector
+from .broadcast import WindowsVoiceAnnouncer, VoiceSettings
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = ImageTk = None
+
+BG='#0b0d10'; PANEL='#15191e'; PANEL2='#1d232a'; TEXT='#f3f5f7'; MUTED='#98a2ad'
+ACCENT='#0b84ff'; GOLD='#ffc247'; GREEN='#45d483'; RED='#ff5757'; LINE='#24303c'; BLUE='#20a8ff'
+
+
+APP_USER_MODEL_ID='MXBRaceDayLive.Desktop.v3'
+try:
+    if os.name=='nt':
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+except Exception:
+    pass
+
+NAV = [
+    ('MY PROFILE','PROFILE'),
+    ('GARAGE','GARAGE'),
+    ('FIND A RACE','UPCOMING'),
+    ('LIVE','LIVE'),
+    ('RESULTS','RESULTS'),
+    ('SERIES','CHAMPIONSHIPS'),
+    ('RANKINGS','RANKINGS'),
+    ('ADMIN','ADMIN'),
+]
+
+class RaceDayLiveApp(tk.Tk):
+    def __init__(self):
+        super().__init__(); seed(); self.conn=connect(); apply_low_entry_pricing(self.conn); ensure_subscription_schema(self.conn); self.settings=load_settings(); self.current_rider='Welchy'
+        self.mx_agent=MXRaceAgent(connect,self.current_rider); ensure_game_bridge_schema(self.conn); self.game_bridge=MXGameBridge(self.conn); self.bike_garage=MXBikeGarage(self.conn,self.game_bridge,self.current_rider); self.garage_renderer=InAppGarageRenderer(self.bike_garage); self.track_media=TrackMediaResolver(connect)
+        self.commentary_director=CommentaryDirector(); self.commentary_history=[]; self.commentary_last_event_id=0
+        def _setting(key,default=''):
+            row=self.conn.execute('SELECT value FROM admin_settings WHERE key=?',(key,)).fetchone(); return (row['value'] if row else default)
+        voice_enabled=str(_setting('announcer_spoken_enabled','true')).lower()=='true'
+        try:voice_rate=int(_setting('announcer_voice_rate','2'))
+        except Exception:voice_rate=2
+        self.announcer=WindowsVoiceAnnouncer(VoiceSettings(enabled=voice_enabled,rate=voice_rate,voice_name=_setting('announcer_voice_name','')))
+        self._image_refs=[]; self._photo_cache={}; self._profile_photo_cache={}; self._track_media_mem={}; self._mx_sync_started=False; self.profile_section='OVERVIEW'; self.race_filter='ALL'; self.current_page='PROFILE'
+        self.title(f'{APP_NAME}  v{VERSION}'); self.geometry('1480x900'); self.minsize(1180,760); self.configure(bg=BG)
+        self._taskbar_icon_path=os.path.join(os.path.dirname(os.path.dirname(__file__)),'assets','mxb_race_day_live.ico')
+        self._taskbar_icon=None
+        try:
+            if os.path.isfile(self._taskbar_icon_path):
+                self.iconbitmap(default=self._taskbar_icon_path)
+                if Image is not None and ImageTk is not None:
+                    with Image.open(self._taskbar_icon_path) as icon_im:
+                        icon_im=icon_im.convert('RGBA'); icon_im.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        self._taskbar_icon=ImageTk.PhotoImage(icon_im.copy())
+                    self.iconphoto(True,self._taskbar_icon)
+        except Exception:pass
+        try:self.update_idletasks()
+        except Exception:pass
+        self.after_idle(self._apply_windows_taskbar_icon)
+        self.after(250,self._apply_windows_taskbar_icon)
+        self.after(1000,self._apply_windows_taskbar_icon)
+        try:self.bind('<Map>',lambda e:self.after_idle(self._apply_windows_taskbar_icon),add='+')
+        except Exception:pass
+        self._styles(); self._layout(); self.show('PROFILE')
+        self.protocol('WM_DELETE_WINDOW',self._on_close)
+        self.after(650,self._start_mx_sync)
+        if self.settings.get('auto_check_updates'): self.after(1300,self._silent_update_check)
+
+    def _styles(self):
+        s=ttk.Style(self); s.theme_use('clam')
+        s.configure('Treeview',background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=34,bordercolor=LINE,font=('Segoe UI',10))
+        s.configure('Treeview.Heading',background=PANEL2,foreground=TEXT,font=('Segoe UI Semibold',10),relief='flat')
+        s.map('Treeview',background=[('selected','#2d3944')])
+        s.configure('TNotebook',background=BG,borderwidth=0); s.configure('TNotebook.Tab',padding=(14,8))
+
+    def _layout(self):
+        header=tk.Frame(self,bg=BG,height=74); header.pack(fill='x'); header.pack_propagate(False)
+        brand=tk.Frame(header,bg=BG); brand.pack(side='left',padx=24)
+        tk.Label(brand,text='MXB',fg=TEXT,bg=BG,font=('Segoe UI Black',26,'italic')).pack(side='left')
+        tk.Label(brand,text=' RACE DAY',fg=TEXT,bg=BG,font=('Segoe UI Black',22)).pack(side='left')
+        tk.Label(brand,text=' LIVE',fg=ACCENT,bg=BG,font=('Segoe UI Black',22,'italic')).pack(side='left')
+        self.update_btn=tk.Button(header,text='UPDATE',command=self.do_update,bg=ACCENT,fg='white',activebackground='#ff7a30',relief='flat',font=('Segoe UI Semibold',10),padx=18,pady=8,cursor='hand2'); self.update_btn.pack(side='right',padx=24,pady=18)
+        tk.Label(header,text=f'v{VERSION}',fg=MUTED,bg=BG,font=('Segoe UI',9)).pack(side='right')
+        tk.Frame(self,bg=ACCENT,height=3).pack(fill='x')
+        b
+
+--- needle: PROFILE SETTINGS @ 16145 ---
+  target_dir.mkdir(parents=True,exist_ok=True)
+        target=target_dir/f'{kind}.png'
+        if Image is None:
+            shutil.copy2(source,target)
+            return str(target)
+        from PIL import ImageOps
+        target_size=(640,640) if kind=='avatar' else (1800,520)
+        with Image.open(source) as im:
+            im=im.convert('RGB')
+            # Store normalized media so JPEG/WebP/GIF/huge phone photos all render the same way.
+            im=ImageOps.fit(im,target_size,method=Image.Resampling.LANCZOS)
+            im.save(target,'PNG',optimize=True)
+        return str(target)
+
+    def _profile_avatar(self,parent,rider,size=108):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        wrap=tk.Frame(parent,bg=PANEL,width=size,height=size,highlightbackground=accent,highlightthickness=3)
+        wrap.pack_propagate(False)
+        photo=self._load_profile_photo((rider['avatar_path'] or '').strip(),(size,size))
+        if photo:
+            tk.Label(wrap,image=photo,bg=PANEL).pack(fill='both',expand=True)
+            return wrap
+        canvas=tk.Canvas(wrap,width=size,height=size,bg=PANEL,highlightthickness=0); canvas.pack(fill='both',expand=True)
+        canvas.create_oval(8,8,size-8,size-8,fill=PANEL2,outline=accent,width=3)
+        initials=''.join(x[0] for x in rider['username'].split()[:2]).upper() or '?'
+        canvas.create_text(size/2,size/2,text=initials,fill=TEXT,font=('Segoe UI Black',28))
+        return wrap
+
+    def _profile_header(self,rider):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        header=self.card(self.content); header.pack(fill='x',padx=28,pady=(24,10))
+        banner=tk.Frame(header,bg='#0e1115',height=190); banner.pack(fill='x'); banner.pack_propagate(False)
+        banner_photo=self._load_profile_photo((rider['banner_path'] or '').strip(),(1180,190)) if 'banner_path' in rider.keys() else None
+        if banner_photo:
+            tk.Label(banner,image=banner_photo,bg='#0e1115').pack(fill='both',expand=True)
+        else:
+            can=tk.Canvas(banner,bg='#0e1115',highlightthickness=0); can.pack(fill='both',expand=True)
+            can.create_rectangle(0,0,1800,190,fill='#11161c',outline='')
+            for x in range(-200,1900,130): can.create_polygon(x,190,x+260,0,x+330,0,x+70,190,fill='#171d24',outline='')
+            can.create_text(28,32,text='MXB RACE DAY LIVE',anchor='nw',fill='#3b4652',font=('Segoe UI Black',25,'italic'))
+        identity=tk.Frame(header,bg=PANEL); identity.pack(fill='x',padx=18,pady=14)
+        avatar=self._profile_avatar(identity,rider,108); avatar.pack(side='left',padx=(0,18))
+        info=tk.Frame(identity,bg=PANEL); info.pack(side='left',fill='x',expand=True)
+        name_row=tk.Frame(info,bg=PANEL); name_row.pack(fill='x')
+        tk.Label(name_row,text=rider['username'],fg=TEXT,bg=PANEL,font=('Segoe UI Black',28)).pack(side='left')
+        tk.Label(name_row,text=f"  ◆ #{self.overall_rank(rider)}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',11)).pack(side='left',pady=(9,0))
+        meta=[f"#{rider['number']}" if rider['number'] else '',rider['team'] or '',rider['bike_model'] or '',rider['region'] or '']
+        tk.Label(info,text='  •  '.join(x for x in meta if x),fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w',pady=(2,9))
+        badges=tk.Frame(info,bg=PANEL); badges.pack(anchor='w')
+        for title,value,color in (
+            ('SKILL STATUS',f"{rider['skill_class'].upper()}  •  {rider['skill_rating']} MMR",GOLD),
+            ('ETIQUETTE',f"{rider['racecraft_grade']}  •  {self.etiquette_text(rider)}  •  {rider['racecraft_score']}",GREEN if rider['racecraft_score']>=800 else GOLD),
+        ):
+            box=tk.Frame(badges,bg=PANEL2,highlightbackground=LINE,highlightthickness=1); box.pack(side='left',padx=(0,8))
+            tk.Label(box,text=title,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(6,0))
+            tk.Label(box,text=value,fg=color,bg=PANEL2,font=('Segoe UI Black',10)).pack(anchor='w',padx=10,pady=(0,6))
+        return header
+
+    def _set_profile_section(self,section):
+        self.profile_section=section
+        self.show('PROFILE',force=True)
+
+    def _profile_subnav(self):
+        row=tk.Frame(self.content,bg=BG); row.pack(fill='x',padx=28,pady=(0,12))
+        for label,key in [('OVERVIEW','OVERVIEW'),('MY RACES','RACES'),('WALLET','WALLET'),('MEMBERSHIP','MEMBERSHIP'),('PROFILE SETTINGS','SETTINGS')]:
+            active=self.profile_section==key
+            tk.Button(row,text=label,command=lambda k=key:self._set_profile_section(k),bg=ACCENT if active else PANEL2,fg='white' if active else TEXT,activebackground=ACCENT,activeforeground='white',relief='flat',font=('Segoe UI Black' if active else 'Segoe UI Semibold',9),padx=16,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+
+    def _bind_click_recursive(self, widget, callback):
+        try:
+            widget.configure(cursor='hand2')
+        except Exception:
+            pass
+        widget.bind('<Button-1>',lambda e:callback())
+        for child in widget.winfo_children():
+            self._bind_click_recursive(child,callback)
+
+    def _scrollable(self, parent, padx=28, pady=(0,24)):
+        outer=tk.Frame(parent,bg=BG); outer.pack(fill='both',expand=True,padx=padx,pady=pady)
+        canvas=tk.Canvas(outer,bg=BG,highlightthickness=0)
+        bar=ttk.Scrollbar(outer,orient='vertical',command=canvas.yview)
+        canvas.configure(yscrollcommand=bar.set); bar.pack(side='right',fill='y'); canvas.pack(side='left',fill='both',expand=True)
+        inner=tk.Frame(canvas,bg=BG); win=canvas.create_window((0,0),window=inner,anchor='nw')
+        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(win,width=e.width))
+        canvas.bind_all('<MouseWheel>',lambda e:canvas.yview_scroll(int(-1*(e.delta/120)),'units'))
+        return inner
+
+    def _load_track_tk(self,path,size=(330,186)):
+        if not path or Image is None or ImageTk is None:return None
+        try:
+            source=Path(path)
+            if not source.exists():return None
+            stat=source.stat(); key=(str(source.resolve()).lower(),tuple(size),int(stat.st_mtime_ns),int(stat.st_size))
+            cached=self._photo_cache.get(key)
+            if cached is not None:return cached
+            with Image.open(source) as im:
+                im=im.convert('RGB'); im.thumbnail(size,Image.Resampling.LANCZOS)
+                canvas=Image.new('RGB',size,(21,25,30)); x=(size[0]-im.width)//2; y=(size[1]-im.height)//2; canvas.paste(im,(x,y))
+                photo=ImageTk.PhotoImage(canvas)
+            self._photo_cache[key]=photo
+            while len(self._photo_cache)>96:self._photo_cache.pop(next(iter(self._photo_cache)))
+            return photo
+        except Exception:return None
+
+    def _track_photo(self,parent,discipline,track,size=(330,186),on_click=None,on_resolved=None):
+        wrap=tk.Frame(parent,bg='#0f1216',width=size[0],height=size[1],highlightbackground=LINE,highlightthickness=1)
+        wrap.pack_propagate(False)
+        label=tk.Label(wrap,text='MXB-SHOP TRACK PHOTO\nLOADING…',fg=MUTED,bg='#0f1216',font=('Segoe UI Semibold',9),justify='center')
+        label.pack(fill='both',expand=True)
+        if on_click:
+            label.configure(cursor='hand2'); label.bind('<Button-1>',lambda e:on_click())
+        media_key=(str(discipline).upper(),str(track))
+        def apply(media):
+            self._track_media_mem[media_key]=media
+            try:
+                if not label.winfo_exists(): return
+            except Exception:
+                return
+            photo=self._load_track_tk(media.local_path,size)
+            if photo:
+                label.configure(image=photo,text='')
+            elif media.status in ('ERROR','NOT_FOUND'):
+                label.configure(text='MXB-SHOP TRACK PHOTO\nSOURCE RETRY AVAILABLE',fg=GOLD)
+            if on_resolved:
+                try:on_resolved(media)
+                except Exception:pass
+        cached=self._track_media_mem.get(media_key)
+        if cached is None:
+            cached=self.track_media.get_cached(discipline,track); self._track_media_mem[media_key]=cached
+        if cached.status=='READY' and cached.local_path and Path(cached.local_path).exists():
+            apply(cached)
+        else:
+            self.track_media.resolve_async(discipline,track,callback=lambda m:self.after(0,lambda:apply(m)))
+        return wrap
+
+    def _start_mx_sync(self):
+        if self._mx_sync_started:
+            return
+        self._mx_sync_started=True
+        self._run_mx_sync()
+
+    def _run_mx_sync(self):
+        if not self.winfo_exists(): return
+        try:
+            self.mx_status_label.configure(text='● SYNCING MX BIKES…',fg=GOLD)
+        except Exception:
+            pass
+        def done(env):
+            try:self.after(0,l
+
+--- needle: My Races @ 16076 ---
+        target_dir=APPDATA/'profile_media'/f'rider_{rider_id}'
+        target_dir.mkdir(parents=True,exist_ok=True)
+        target=target_dir/f'{kind}.png'
+        if Image is None:
+            shutil.copy2(source,target)
+            return str(target)
+        from PIL import ImageOps
+        target_size=(640,640) if kind=='avatar' else (1800,520)
+        with Image.open(source) as im:
+            im=im.convert('RGB')
+            # Store normalized media so JPEG/WebP/GIF/huge phone photos all render the same way.
+            im=ImageOps.fit(im,target_size,method=Image.Resampling.LANCZOS)
+            im.save(target,'PNG',optimize=True)
+        return str(target)
+
+    def _profile_avatar(self,parent,rider,size=108):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        wrap=tk.Frame(parent,bg=PANEL,width=size,height=size,highlightbackground=accent,highlightthickness=3)
+        wrap.pack_propagate(False)
+        photo=self._load_profile_photo((rider['avatar_path'] or '').strip(),(size,size))
+        if photo:
+            tk.Label(wrap,image=photo,bg=PANEL).pack(fill='both',expand=True)
+            return wrap
+        canvas=tk.Canvas(wrap,width=size,height=size,bg=PANEL,highlightthickness=0); canvas.pack(fill='both',expand=True)
+        canvas.create_oval(8,8,size-8,size-8,fill=PANEL2,outline=accent,width=3)
+        initials=''.join(x[0] for x in rider['username'].split()[:2]).upper() or '?'
+        canvas.create_text(size/2,size/2,text=initials,fill=TEXT,font=('Segoe UI Black',28))
+        return wrap
+
+    def _profile_header(self,rider):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        header=self.card(self.content); header.pack(fill='x',padx=28,pady=(24,10))
+        banner=tk.Frame(header,bg='#0e1115',height=190); banner.pack(fill='x'); banner.pack_propagate(False)
+        banner_photo=self._load_profile_photo((rider['banner_path'] or '').strip(),(1180,190)) if 'banner_path' in rider.keys() else None
+        if banner_photo:
+            tk.Label(banner,image=banner_photo,bg='#0e1115').pack(fill='both',expand=True)
+        else:
+            can=tk.Canvas(banner,bg='#0e1115',highlightthickness=0); can.pack(fill='both',expand=True)
+            can.create_rectangle(0,0,1800,190,fill='#11161c',outline='')
+            for x in range(-200,1900,130): can.create_polygon(x,190,x+260,0,x+330,0,x+70,190,fill='#171d24',outline='')
+            can.create_text(28,32,text='MXB RACE DAY LIVE',anchor='nw',fill='#3b4652',font=('Segoe UI Black',25,'italic'))
+        identity=tk.Frame(header,bg=PANEL); identity.pack(fill='x',padx=18,pady=14)
+        avatar=self._profile_avatar(identity,rider,108); avatar.pack(side='left',padx=(0,18))
+        info=tk.Frame(identity,bg=PANEL); info.pack(side='left',fill='x',expand=True)
+        name_row=tk.Frame(info,bg=PANEL); name_row.pack(fill='x')
+        tk.Label(name_row,text=rider['username'],fg=TEXT,bg=PANEL,font=('Segoe UI Black',28)).pack(side='left')
+        tk.Label(name_row,text=f"  ◆ #{self.overall_rank(rider)}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',11)).pack(side='left',pady=(9,0))
+        meta=[f"#{rider['number']}" if rider['number'] else '',rider['team'] or '',rider['bike_model'] or '',rider['region'] or '']
+        tk.Label(info,text='  •  '.join(x for x in meta if x),fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w',pady=(2,9))
+        badges=tk.Frame(info,bg=PANEL); badges.pack(anchor='w')
+        for title,value,color in (
+            ('SKILL STATUS',f"{rider['skill_class'].upper()}  •  {rider['skill_rating']} MMR",GOLD),
+            ('ETIQUETTE',f"{rider['racecraft_grade']}  •  {self.etiquette_text(rider)}  •  {rider['racecraft_score']}",GREEN if rider['racecraft_score']>=800 else GOLD),
+        ):
+            box=tk.Frame(badges,bg=PANEL2,highlightbackground=LINE,highlightthickness=1); box.pack(side='left',padx=(0,8))
+            tk.Label(box,text=title,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(6,0))
+            tk.Label(box,text=value,fg=color,bg=PANEL2,font=('Segoe UI Black',10)).pack(anchor='w',padx=10,pady=(0,6))
+        return header
+
+    def _set_profile_section(self,section):
+        self.profile_section=section
+        self.show('PROFILE',force=True)
+
+    def _profile_subnav(self):
+        row=tk.Frame(self.content,bg=BG); row.pack(fill='x',padx=28,pady=(0,12))
+        for label,key in [('OVERVIEW','OVERVIEW'),('MY RACES','RACES'),('WALLET','WALLET'),('MEMBERSHIP','MEMBERSHIP'),('PROFILE SETTINGS','SETTINGS')]:
+            active=self.profile_section==key
+            tk.Button(row,text=label,command=lambda k=key:self._set_profile_section(k),bg=ACCENT if active else PANEL2,fg='white' if active else TEXT,activebackground=ACCENT,activeforeground='white',relief='flat',font=('Segoe UI Black' if active else 'Segoe UI Semibold',9),padx=16,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+
+    def _bind_click_recursive(self, widget, callback):
+        try:
+            widget.configure(cursor='hand2')
+        except Exception:
+            pass
+        widget.bind('<Button-1>',lambda e:callback())
+        for child in widget.winfo_children():
+            self._bind_click_recursive(child,callback)
+
+    def _scrollable(self, parent, padx=28, pady=(0,24)):
+        outer=tk.Frame(parent,bg=BG); outer.pack(fill='both',expand=True,padx=padx,pady=pady)
+        canvas=tk.Canvas(outer,bg=BG,highlightthickness=0)
+        bar=ttk.Scrollbar(outer,orient='vertical',command=canvas.yview)
+        canvas.configure(yscrollcommand=bar.set); bar.pack(side='right',fill='y'); canvas.pack(side='left',fill='both',expand=True)
+        inner=tk.Frame(canvas,bg=BG); win=canvas.create_window((0,0),window=inner,anchor='nw')
+        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(win,width=e.width))
+        canvas.bind_all('<MouseWheel>',lambda e:canvas.yview_scroll(int(-1*(e.delta/120)),'units'))
+        return inner
+
+    def _load_track_tk(self,path,size=(330,186)):
+        if not path or Image is None or ImageTk is None:return None
+        try:
+            source=Path(path)
+            if not source.exists():return None
+            stat=source.stat(); key=(str(source.resolve()).lower(),tuple(size),int(stat.st_mtime_ns),int(stat.st_size))
+            cached=self._photo_cache.get(key)
+            if cached is not None:return cached
+            with Image.open(source) as im:
+                im=im.convert('RGB'); im.thumbnail(size,Image.Resampling.LANCZOS)
+                canvas=Image.new('RGB',size,(21,25,30)); x=(size[0]-im.width)//2; y=(size[1]-im.height)//2; canvas.paste(im,(x,y))
+                photo=ImageTk.PhotoImage(canvas)
+            self._photo_cache[key]=photo
+            while len(self._photo_cache)>96:self._photo_cache.pop(next(iter(self._photo_cache)))
+            return photo
+        except Exception:return None
+
+    def _track_photo(self,parent,discipline,track,size=(330,186),on_click=None,on_resolved=None):
+        wrap=tk.Frame(parent,bg='#0f1216',width=size[0],height=size[1],highlightbackground=LINE,highlightthickness=1)
+        wrap.pack_propagate(False)
+        label=tk.Label(wrap,text='MXB-SHOP TRACK PHOTO\nLOADING…',fg=MUTED,bg='#0f1216',font=('Segoe UI Semibold',9),justify='center')
+        label.pack(fill='both',expand=True)
+        if on_click:
+            label.configure(cursor='hand2'); label.bind('<Button-1>',lambda e:on_click())
+        media_key=(str(discipline).upper(),str(track))
+        def apply(media):
+            self._track_media_mem[media_key]=media
+            try:
+                if not label.winfo_exists(): return
+            except Exception:
+                return
+            photo=self._load_track_tk(media.local_path,size)
+            if photo:
+                label.configure(image=photo,text='')
+            elif media.status in ('ERROR','NOT_FOUND'):
+                label.configure(text='MXB-SHOP TRACK PHOTO\nSOURCE RETRY AVAILABLE',fg=GOLD)
+            if on_resolved:
+                try:on_resolved(media)
+                except Exception:pass
+        cached=self._track_media_mem.get(media_key)
+        if cached is None:
+            cached=self.track_media.get_cached(discipline,track); self._track_media_mem[media_key]=cached
+        if cached.status=='READY' and cached.local_path and Path(cached.local_path).exists():
+            apply(cached)
+        else:
+            self.track_media.resolve_async(discipline,track,callback=lambda m:self.after(0,lambda:apply(m)))
+        return wrap
+
+    def _start_mx_sync(self):
+        if self._mx_sync_started:
+            return
+        self._mx_sync_started=True
+        self._run_mx_sync()
+
+    def _run_mx_sync(self):
+        if not self.winfo_exists(): return
+        try:
+            self.mx_status_label.configure(text='● SYNCING MX BIKES…',fg=GOLD)
+        except Exception:
+ 
+
+--- needle: MY RACES @ 16076 ---
+        target_dir=APPDATA/'profile_media'/f'rider_{rider_id}'
+        target_dir.mkdir(parents=True,exist_ok=True)
+        target=target_dir/f'{kind}.png'
+        if Image is None:
+            shutil.copy2(source,target)
+            return str(target)
+        from PIL import ImageOps
+        target_size=(640,640) if kind=='avatar' else (1800,520)
+        with Image.open(source) as im:
+            im=im.convert('RGB')
+            # Store normalized media so JPEG/WebP/GIF/huge phone photos all render the same way.
+            im=ImageOps.fit(im,target_size,method=Image.Resampling.LANCZOS)
+            im.save(target,'PNG',optimize=True)
+        return str(target)
+
+    def _profile_avatar(self,parent,rider,size=108):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        wrap=tk.Frame(parent,bg=PANEL,width=size,height=size,highlightbackground=accent,highlightthickness=3)
+        wrap.pack_propagate(False)
+        photo=self._load_profile_photo((rider['avatar_path'] or '').strip(),(size,size))
+        if photo:
+            tk.Label(wrap,image=photo,bg=PANEL).pack(fill='both',expand=True)
+            return wrap
+        canvas=tk.Canvas(wrap,width=size,height=size,bg=PANEL,highlightthickness=0); canvas.pack(fill='both',expand=True)
+        canvas.create_oval(8,8,size-8,size-8,fill=PANEL2,outline=accent,width=3)
+        initials=''.join(x[0] for x in rider['username'].split()[:2]).upper() or '?'
+        canvas.create_text(size/2,size/2,text=initials,fill=TEXT,font=('Segoe UI Black',28))
+        return wrap
+
+    def _profile_header(self,rider):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        header=self.card(self.content); header.pack(fill='x',padx=28,pady=(24,10))
+        banner=tk.Frame(header,bg='#0e1115',height=190); banner.pack(fill='x'); banner.pack_propagate(False)
+        banner_photo=self._load_profile_photo((rider['banner_path'] or '').strip(),(1180,190)) if 'banner_path' in rider.keys() else None
+        if banner_photo:
+            tk.Label(banner,image=banner_photo,bg='#0e1115').pack(fill='both',expand=True)
+        else:
+            can=tk.Canvas(banner,bg='#0e1115',highlightthickness=0); can.pack(fill='both',expand=True)
+            can.create_rectangle(0,0,1800,190,fill='#11161c',outline='')
+            for x in range(-200,1900,130): can.create_polygon(x,190,x+260,0,x+330,0,x+70,190,fill='#171d24',outline='')
+            can.create_text(28,32,text='MXB RACE DAY LIVE',anchor='nw',fill='#3b4652',font=('Segoe UI Black',25,'italic'))
+        identity=tk.Frame(header,bg=PANEL); identity.pack(fill='x',padx=18,pady=14)
+        avatar=self._profile_avatar(identity,rider,108); avatar.pack(side='left',padx=(0,18))
+        info=tk.Frame(identity,bg=PANEL); info.pack(side='left',fill='x',expand=True)
+        name_row=tk.Frame(info,bg=PANEL); name_row.pack(fill='x')
+        tk.Label(name_row,text=rider['username'],fg=TEXT,bg=PANEL,font=('Segoe UI Black',28)).pack(side='left')
+        tk.Label(name_row,text=f"  ◆ #{self.overall_rank(rider)}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',11)).pack(side='left',pady=(9,0))
+        meta=[f"#{rider['number']}" if rider['number'] else '',rider['team'] or '',rider['bike_model'] or '',rider['region'] or '']
+        tk.Label(info,text='  •  '.join(x for x in meta if x),fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w',pady=(2,9))
+        badges=tk.Frame(info,bg=PANEL); badges.pack(anchor='w')
+        for title,value,color in (
+            ('SKILL STATUS',f"{rider['skill_class'].upper()}  •  {rider['skill_rating']} MMR",GOLD),
+            ('ETIQUETTE',f"{rider['racecraft_grade']}  •  {self.etiquette_text(rider)}  •  {rider['racecraft_score']}",GREEN if rider['racecraft_score']>=800 else GOLD),
+        ):
+            box=tk.Frame(badges,bg=PANEL2,highlightbackground=LINE,highlightthickness=1); box.pack(side='left',padx=(0,8))
+            tk.Label(box,text=title,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(6,0))
+            tk.Label(box,text=value,fg=color,bg=PANEL2,font=('Segoe UI Black',10)).pack(anchor='w',padx=10,pady=(0,6))
+        return header
+
+    def _set_profile_section(self,section):
+        self.profile_section=section
+        self.show('PROFILE',force=True)
+
+    def _profile_subnav(self):
+        row=tk.Frame(self.content,bg=BG); row.pack(fill='x',padx=28,pady=(0,12))
+        for label,key in [('OVERVIEW','OVERVIEW'),('MY RACES','RACES'),('WALLET','WALLET'),('MEMBERSHIP','MEMBERSHIP'),('PROFILE SETTINGS','SETTINGS')]:
+            active=self.profile_section==key
+            tk.Button(row,text=label,command=lambda k=key:self._set_profile_section(k),bg=ACCENT if active else PANEL2,fg='white' if active else TEXT,activebackground=ACCENT,activeforeground='white',relief='flat',font=('Segoe UI Black' if active else 'Segoe UI Semibold',9),padx=16,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+
+    def _bind_click_recursive(self, widget, callback):
+        try:
+            widget.configure(cursor='hand2')
+        except Exception:
+            pass
+        widget.bind('<Button-1>',lambda e:callback())
+        for child in widget.winfo_children():
+            self._bind_click_recursive(child,callback)
+
+    def _scrollable(self, parent, padx=28, pady=(0,24)):
+        outer=tk.Frame(parent,bg=BG); outer.pack(fill='both',expand=True,padx=padx,pady=pady)
+        canvas=tk.Canvas(outer,bg=BG,highlightthickness=0)
+        bar=ttk.Scrollbar(outer,orient='vertical',command=canvas.yview)
+        canvas.configure(yscrollcommand=bar.set); bar.pack(side='right',fill='y'); canvas.pack(side='left',fill='both',expand=True)
+        inner=tk.Frame(canvas,bg=BG); win=canvas.create_window((0,0),window=inner,anchor='nw')
+        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(win,width=e.width))
+        canvas.bind_all('<MouseWheel>',lambda e:canvas.yview_scroll(int(-1*(e.delta/120)),'units'))
+        return inner
+
+    def _load_track_tk(self,path,size=(330,186)):
+        if not path or Image is None or ImageTk is None:return None
+        try:
+            source=Path(path)
+            if not source.exists():return None
+            stat=source.stat(); key=(str(source.resolve()).lower(),tuple(size),int(stat.st_mtime_ns),int(stat.st_size))
+            cached=self._photo_cache.get(key)
+            if cached is not None:return cached
+            with Image.open(source) as im:
+                im=im.convert('RGB'); im.thumbnail(size,Image.Resampling.LANCZOS)
+                canvas=Image.new('RGB',size,(21,25,30)); x=(size[0]-im.width)//2; y=(size[1]-im.height)//2; canvas.paste(im,(x,y))
+                photo=ImageTk.PhotoImage(canvas)
+            self._photo_cache[key]=photo
+            while len(self._photo_cache)>96:self._photo_cache.pop(next(iter(self._photo_cache)))
+            return photo
+        except Exception:return None
+
+    def _track_photo(self,parent,discipline,track,size=(330,186),on_click=None,on_resolved=None):
+        wrap=tk.Frame(parent,bg='#0f1216',width=size[0],height=size[1],highlightbackground=LINE,highlightthickness=1)
+        wrap.pack_propagate(False)
+        label=tk.Label(wrap,text='MXB-SHOP TRACK PHOTO\nLOADING…',fg=MUTED,bg='#0f1216',font=('Segoe UI Semibold',9),justify='center')
+        label.pack(fill='both',expand=True)
+        if on_click:
+            label.configure(cursor='hand2'); label.bind('<Button-1>',lambda e:on_click())
+        media_key=(str(discipline).upper(),str(track))
+        def apply(media):
+            self._track_media_mem[media_key]=media
+            try:
+                if not label.winfo_exists(): return
+            except Exception:
+                return
+            photo=self._load_track_tk(media.local_path,size)
+            if photo:
+                label.configure(image=photo,text='')
+            elif media.status in ('ERROR','NOT_FOUND'):
+                label.configure(text='MXB-SHOP TRACK PHOTO\nSOURCE RETRY AVAILABLE',fg=GOLD)
+            if on_resolved:
+                try:on_resolved(media)
+                except Exception:pass
+        cached=self._track_media_mem.get(media_key)
+        if cached is None:
+            cached=self.track_media.get_cached(discipline,track); self._track_media_mem[media_key]=cached
+        if cached.status=='READY' and cached.local_path and Path(cached.local_path).exists():
+            apply(cached)
+        else:
+            self.track_media.resolve_async(discipline,track,callback=lambda m:self.after(0,lambda:apply(m)))
+        return wrap
+
+    def _start_mx_sync(self):
+        if self._mx_sync_started:
+            return
+        self._mx_sync_started=True
+        self._run_mx_sync()
+
+    def _run_mx_sync(self):
+        if not self.winfo_exists(): return
+        try:
+            self.mx_status_label.configure(text='● SYNCING MX BIKES…',fg=GOLD)
+        except Exception:
+ 
+
+--- needle: banner @ 13382 ---
+ ','_'))()
+
+    def titlebar(self,title,sub=''):
+        f=tk.Frame(self.content,bg=BG); f.pack(fill='x',padx=28,pady=(24,16))
+        tk.Label(f,text=title,fg=TEXT,bg=BG,font=('Segoe UI Black',24)).pack(anchor='w')
+        if sub:tk.Label(f,text=sub,fg=MUTED,bg=BG,font=('Segoe UI',10),wraplength=1100,justify='left').pack(anchor='w',pady=(3,0))
+        return f
+    def card(self,parent):return tk.Frame(parent,bg=PANEL,highlightbackground=LINE,highlightthickness=1)
+    def stat(self,parent,label,value,accent=False):
+        c=self.card(parent); c.pack(side='left',fill='both',expand=True,padx=5)
+        tk.Label(c,text=label,fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',9)).pack(anchor='w',padx=16,pady=(14,2))
+        tk.Label(c,text=value,fg=GOLD if accent else TEXT,bg=PANEL,font=('Segoe UI Black',20)).pack(anchor='w',padx=16,pady=(0,14))
+    def rider(self):return self.conn.execute('SELECT * FROM riders WHERE username=?',(self.current_rider,)).fetchone()
+    def is_admin(self):
+        r=self.rider(); return bool(r and str(r['role']).upper() in ('OWNER','ADMIN'))
+    def overall_rank(self,rider=None):
+        rider=rider or self.rider()
+        return self.conn.execute('SELECT COUNT(*)+1 FROM riders WHERE skill_rating>?',(rider['skill_rating'],)).fetchone()[0]
+    def etiquette_text(self,rider=None):
+        rider=rider or self.rider()
+        names={'S':'ELITE','A':'CLEAN','B':'GOOD','C':'WATCH','D':'POOR','F':'RESTRICTED'}
+        return names.get((rider['racecraft_grade'] or '').upper(),'UNRATED')
+    def eligible(self,race,rider=None):
+        rider=rider or self.rider()
+        return race['min_skill']<=rider['skill_rating']<=race['max_skill'] and rider['racecraft_score']>=race['min_racecraft']
+
+    def _load_profile_photo(self,path,size):
+        if not path or Image is None or ImageTk is None:return None
+        try:
+            source=Path(path)
+            if not source.exists():return None
+            stat=source.stat(); key=(str(source.resolve()).lower(),tuple(size),int(stat.st_mtime_ns),int(stat.st_size))
+            cached=self._profile_photo_cache.get(key)
+            if cached is not None:return cached
+            from PIL import ImageOps
+            with Image.open(source) as im:
+                im=im.convert('RGB'); im=ImageOps.fit(im,size,method=Image.Resampling.LANCZOS); im.load(); photo=ImageTk.PhotoImage(im.copy())
+            self._profile_photo_cache[key]=photo
+            while len(self._profile_photo_cache)>24:self._profile_photo_cache.pop(next(iter(self._profile_photo_cache)))
+            return photo
+        except Exception:return None
+
+    def _store_profile_image(self,source,rider_id,kind):
+        source=Path(source)
+        target_dir=APPDATA/'profile_media'/f'rider_{rider_id}'
+        target_dir.mkdir(parents=True,exist_ok=True)
+        target=target_dir/f'{kind}.png'
+        if Image is None:
+            shutil.copy2(source,target)
+            return str(target)
+        from PIL import ImageOps
+        target_size=(640,640) if kind=='avatar' else (1800,520)
+        with Image.open(source) as im:
+            im=im.convert('RGB')
+            # Store normalized media so JPEG/WebP/GIF/huge phone photos all render the same way.
+            im=ImageOps.fit(im,target_size,method=Image.Resampling.LANCZOS)
+            im.save(target,'PNG',optimize=True)
+        return str(target)
+
+    def _profile_avatar(self,parent,rider,size=108):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        wrap=tk.Frame(parent,bg=PANEL,width=size,height=size,highlightbackground=accent,highlightthickness=3)
+        wrap.pack_propagate(False)
+        photo=self._load_profile_photo((rider['avatar_path'] or '').strip(),(size,size))
+        if photo:
+            tk.Label(wrap,image=photo,bg=PANEL).pack(fill='both',expand=True)
+            return wrap
+        canvas=tk.Canvas(wrap,width=size,height=size,bg=PANEL,highlightthickness=0); canvas.pack(fill='both',expand=True)
+        canvas.create_oval(8,8,size-8,size-8,fill=PANEL2,outline=accent,width=3)
+        initials=''.join(x[0] for x in rider['username'].split()[:2]).upper() or '?'
+        canvas.create_text(size/2,size/2,text=initials,fill=TEXT,font=('Segoe UI Black',28))
+        return wrap
+
+    def _profile_header(self,rider):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        header=self.card(self.content); header.pack(fill='x',padx=28,pady=(24,10))
+        banner=tk.Frame(header,bg='#0e1115',height=190); banner.pack(fill='x'); banner.pack_propagate(False)
+        banner_photo=self._load_profile_photo((rider['banner_path'] or '').strip(),(1180,190)) if 'banner_path' in rider.keys() else None
+        if banner_photo:
+            tk.Label(banner,image=banner_photo,bg='#0e1115').pack(fill='both',expand=True)
+        else:
+            can=tk.Canvas(banner,bg='#0e1115',highlightthickness=0); can.pack(fill='both',expand=True)
+            can.create_rectangle(0,0,1800,190,fill='#11161c',outline='')
+            for x in range(-200,1900,130): can.create_polygon(x,190,x+260,0,x+330,0,x+70,190,fill='#171d24',outline='')
+            can.create_text(28,32,text='MXB RACE DAY LIVE',anchor='nw',fill='#3b4652',font=('Segoe UI Black',25,'italic'))
+        identity=tk.Frame(header,bg=PANEL); identity.pack(fill='x',padx=18,pady=14)
+        avatar=self._profile_avatar(identity,rider,108); avatar.pack(side='left',padx=(0,18))
+        info=tk.Frame(identity,bg=PANEL); info.pack(side='left',fill='x',expand=True)
+        name_row=tk.Frame(info,bg=PANEL); name_row.pack(fill='x')
+        tk.Label(name_row,text=rider['username'],fg=TEXT,bg=PANEL,font=('Segoe UI Black',28)).pack(side='left')
+        tk.Label(name_row,text=f"  ◆ #{self.overall_rank(rider)}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',11)).pack(side='left',pady=(9,0))
+        meta=[f"#{rider['number']}" if rider['number'] else '',rider['team'] or '',rider['bike_model'] or '',rider['region'] or '']
+        tk.Label(info,text='  •  '.join(x for x in meta if x),fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w',pady=(2,9))
+        badges=tk.Frame(info,bg=PANEL); badges.pack(anchor='w')
+        for title,value,color in (
+            ('SKILL STATUS',f"{rider['skill_class'].upper()}  •  {rider['skill_rating']} MMR",GOLD),
+            ('ETIQUETTE',f"{rider['racecraft_grade']}  •  {self.etiquette_text(rider)}  •  {rider['racecraft_score']}",GREEN if rider['racecraft_score']>=800 else GOLD),
+        ):
+            box=tk.Frame(badges,bg=PANEL2,highlightbackground=LINE,highlightthickness=1); box.pack(side='left',padx=(0,8))
+            tk.Label(box,text=title,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(6,0))
+            tk.Label(box,text=value,fg=color,bg=PANEL2,font=('Segoe UI Black',10)).pack(anchor='w',padx=10,pady=(0,6))
+        return header
+
+    def _set_profile_section(self,section):
+        self.profile_section=section
+        self.show('PROFILE',force=True)
+
+    def _profile_subnav(self):
+        row=tk.Frame(self.content,bg=BG); row.pack(fill='x',padx=28,pady=(0,12))
+        for label,key in [('OVERVIEW','OVERVIEW'),('MY RACES','RACES'),('WALLET','WALLET'),('MEMBERSHIP','MEMBERSHIP'),('PROFILE SETTINGS','SETTINGS')]:
+            active=self.profile_section==key
+            tk.Button(row,text=label,command=lambda k=key:self._set_profile_section(k),bg=ACCENT if active else PANEL2,fg='white' if active else TEXT,activebackground=ACCENT,activeforeground='white',relief='flat',font=('Segoe UI Black' if active else 'Segoe UI Semibold',9),padx=16,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+
+    def _bind_click_recursive(self, widget, callback):
+        try:
+            widget.configure(cursor='hand2')
+        except Exception:
+            pass
+        widget.bind('<Button-1>',lambda e:callback())
+        for child in widget.winfo_children():
+            self._bind_click_recursive(child,callback)
+
+    def _scrollable(self, parent, padx=28, pady=(0,24)):
+        outer=tk.Frame(parent,bg=BG); outer.pack(fill='both',expand=True,padx=padx,pady=pady)
+        canvas=tk.Canvas(outer,bg=BG,highlightthickness=0)
+        bar=ttk.Scrollbar(outer,orient='vertical',command=canvas.yview)
+        canvas.configure(yscrollcommand=bar.set); bar.pack(side='right',fill='y'); canvas.pack(side='left',fill='both',expand=True)
+        inner=tk.Frame(canvas,bg=BG); win=canvas.create_window((0,0),window=inner,anchor='nw')
+        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(win,width=e.width))
+        canvas.bind_all('<MouseWheel>',lambda e:canvas.yview_scroll(int(-1*(e.delta/120)),'units'))
+        return inner
+
+    def _load_track_tk(self,path,size=(330,186)):
+        if not path or Image is None or ImageTk is None:return None
+        try:
+            source=Path(path)
+            if not source.exists():return No
+
+--- needle: profile picture @ 52640 ---
+ommand=lambda k=key:cycle(k,1),bg=PANEL2,fg=TEXT,activebackground='#2d3944',activeforeground='white',relief='flat',font=('Segoe UI Black',9),width=3,cursor='hand2').pack(side='left',padx=(0,5))
+            return box
+
+        group('BIKE',[('Category','category'),('Bike','bikeid'),('Paint','paint'),('Bike Font','bike_font')])
+        group('HEAD',[('Helmet','helmet'),('Helmet Paint','helmet_paint'),('Goggles Paint','goggles_paint'),('Helmet Cam','helmet_cam')])
+        group('TORSO',[('Rider','rider'),('Rider Gear','suit_paint'),('Rider Font','suit_font'),('Gloves Paint','gloves_paint'),('Protection','protection'),('Protection Paint','protection_paint')])
+        group('LEGS',[('Boots','boots'),('Boots Paint','boots_paint')])
+
+        pathbox=tk.Frame(right,bg=PANEL2); pathbox.pack(fill='x',padx=14,pady=(0,10))
+        tk.Label(pathbox,text=f"MX Bikes profile: {diag.get('profile') or 'not detected'}",fg=GREEN if diag.get('profile_ini') else GOLD,bg=PANEL2,font=('Segoe UI Black',9)).pack(anchor='w',padx=10,pady=(9,1))
+        tk.Label(pathbox,text=f"{diag.get('profile_ini') or 'Launch MX Bikes once and sync to create/detect profile.ini'}",fg=MUTED,bg=PANEL2,font=('Segoe UI',8),wraplength=560,justify='left').pack(anchor='w',padx=10,pady=(0,3))
+        tk.Label(pathbox,text=f"{diag.get('bikes',0)} bikes detected  •  Mods: {diag.get('mods_root','')}",fg=MUTED,bg=PANEL2,font=('Segoe UI',8),wraplength=560,justify='left').pack(anchor='w',padx=10,pady=(0,9))
+
+        def apply_game_profile():
+            payload={k:v for k,v in state.items() if k in self.bike_garage.PROFILE_KEYS}
+            payload['race_number']=str(r['number'] or current.get('race_number') or '')
+            try:
+                path=self.bike_garage.apply_selection(payload)
+                messagebox.showinfo('MX Bikes Bike Selection',f"Applied directly to MX Bikes profile:\n{path}\n\nYour original profile.ini was backed up the first time Race Day Live changed it.")
+                self.show('GARAGE',force=True)
+            except BikeGarageError as exc:messagebox.showerror('MX Bikes Bike Selection',str(exc))
+            except Exception as exc:messagebox.showerror('MX Bikes Bike Selection',f'Could not apply the selection: {exc}')
+
+        actions=tk.Frame(right,bg=PANEL); actions.pack(fill='x',padx=14,pady=(0,14))
+        live_controls=tk.Frame(actions,bg=PANEL); live_controls.pack(fill='x',pady=(0,7))
+        tk.Button(live_controls,text='RESET 3D VIEW',command=lambda:draw_garage3d(True),bg=GREEN,fg='white',relief='flat',font=('Segoe UI Black',10),pady=10,cursor='hand2').pack(fill='x')
+        tk.Button(actions,text='APPLY TO MX BIKES',command=apply_game_profile,bg=GREEN,fg='white',relief='flat',font=('Segoe UI Black',11),pady=11,cursor='hand2').pack(fill='x',pady=(0,7))
+        row=tk.Frame(actions,bg=PANEL); row.pack(fill='x')
+        tk.Button(row,text='READ CURRENT GAME SELECTION',command=lambda:self.show('GARAGE',force=True),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Black',9),pady=9,cursor='hand2').pack(side='left',fill='x',expand=True,padx=(0,4))
+        tk.Button(row,text='SYNC GAME CONTENT',command=self._garage_sync_now,bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Black',9),pady=9,cursor='hand2').pack(side='left',fill='x',expand=True,padx=4)
+        tk.Label(right,text='Race Day Live uses MX Bikes native profile values. If a custom model or paint is installed in the correct MX Bikes mod folder, it appears here automatically after sync/reload.',fg=MUTED,bg=PANEL,font=('Segoe UI',8),wraplength=570,justify='left').pack(anchor='w',padx=16,pady=(0,14))
+        refresh_all()
+        self.after_idle(lambda:draw_garage3d(True))
+
+    def _profile_settings(self,r):
+        body=self._scrollable(self.content,pady=(0,24))
+        tk.Label(body,text='PROFILE SETTINGS',fg=TEXT,bg=BG,font=('Segoe UI Black',20)).pack(anchor='w',pady=(4,2))
+        tk.Label(body,text='Customize how your rider profile looks and how MX Bikes identifies you. Verified race statistics, MMR and etiquette scores stay protected.',fg=MUTED,bg=BG,font=('Segoe UI',10),wraplength=1050,justify='left').pack(anchor='w',pady=(0,12))
+        media=self.card(body); media.pack(fill='x',pady=(0,12))
+        tk.Label(media,text='PROFILE MEDIA',fg=ACCENT,bg=PANEL,font=('Segoe UI Black',12)).pack(anchor='w',padx=16,pady=(14,6))
+        choices={'avatar':r['avatar_path'] or '', 'banner':r['banner_path'] or ''}
+        def choose(kind):
+            src=filedialog.askopenfilename(title='Choose Profile Picture' if kind=='avatar' else 'Choose Profile Banner',filetypes=[('Images','*.png *.jpg *.jpeg *.webp *.gif *.bmp'),('All files','*.*')])
+            if not src:return
+            try:
+                choices[kind]=self._store_profile_image(src,r['id'],kind)
+                messagebox.showinfo('Profile Media',('Profile picture' if kind=='avatar' else 'Profile banner')+' selected. Click SAVE PROFILE to apply it.')
+            except Exception as exc:messagebox.showerror('Profile Media',str(exc))
+        media_btns=tk.Frame(media,bg=PANEL); media_btns.pack(fill='x',padx=16,pady=(0,14))
+        for label,kind in [('CHANGE PROFILE PICTURE','avatar'),('CHANGE BANNER','banner')]:
+            tk.Button(media_btns,text=label,command=lambda k=kind:choose(k),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),padx=12,pady=8,cursor='hand2').pack(side='left',padx=(0,7))
+        tk.Button(media_btns,text='REMOVE PICTURE',command=lambda:choices.update(avatar=''),bg=PANEL2,fg=MUTED,relief='flat',font=('Segoe UI',8),padx=9,pady=8).pack(side='left',padx=(8,4))
+        tk.Button(media_btns,text='REMOVE BANNER',command=lambda:choices.update(banner=''),bg=PANEL2,fg=MUTED,relief='flat',font=('Segoe UI',8),padx=9,pady=8).pack(side='left')
+
+        form=self.card(body); form.pack(fill='x')
+        tk.Label(form,text='RIDER INFORMATION',fg=TEXT,bg=PANEL,font=('Segoe UI Black',12)).pack(anchor='w',padx=16,pady=(14,8))
+        grid=tk.Frame(form,bg=PANEL); grid.pack(fill='x',padx=16)
+        fields={}
+        field_defs=[('RIDER NAME','username',r['username']),('RACE NUMBER','number',str(r['number'] or '')),('TEAM','team',r['team'] or ''),('BIKE MODEL','bike_model',r['bike_model'] or ''),('BIKE SIZE','bike_size',r['bike_size'] or ''),('REGION','region',r['region'] or ''),('HOMETOWN','hometown',r['hometown'] or ''),('FAVORITE TRACK','favorite_track',r['favorite_track'] or ''),('SOCIAL / LINK','social_link',r['social_link'] or ''),('PROFILE ACCENT (HEX)','profile_accent',r['profile_accent'] or ACCENT),('STEAM ID','steam_id',r['steam_id'] or ''),('MX BIKES GUID','mx_guid',r['mx_guid'] or ''),('MX BIKES PROFILE','game_profile_name',r['game_profile_name'] or '')]
+        for i,(label,key,value) in enumerate(field_defs):
+            row=i//2; col=i%2
+            cell=tk.Frame(grid,bg=PANEL); cell.grid(row=row,column=col,sticky='ew',padx=(0,10) if col==0 else (10,0),pady=5); grid.columnconfigure(col,weight=1)
+            tk.Label(cell,text=label,fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(anchor='w')
+            v=tk.StringVar(value=value); fields[key]=v
+            tk.Entry(cell,textvariable=v,bg=PANEL2,fg=TEXT,insertbackground=TEXT,relief='flat',font=('Segoe UI',10)).pack(fill='x',ipady=7,pady=(3,0))
+        tk.Label(form,text='BIO',fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(anchor='w',padx=16,pady=(10,3))
+        bio=tk.Text(form,height=4,bg=PANEL2,fg=TEXT,insertbackground=TEXT,relief='flat',font=('Segoe UI',10),wrap='word'); bio.pack(fill='x',padx=16); bio.insert('1.0',r['bio'] or '')
+        status=self.conn.execute("SELECT value FROM game_sync_state WHERE key='last_sync'").fetchone()
+        tk.Label(form,text=f"MX Bikes sync: {status['value'] if status else 'not synced yet'}",fg=GREEN if status else MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(anchor='w',padx=16,pady=(10,2))
+        linkbox=tk.Frame(form,bg=PANEL2); linkbox.pack(fill='x',padx=16,pady=(9,2))
+        tk.Label(linkbox,text='MX BIKES LINK',fg=ACCENT,bg=PANEL2,font=('Segoe UI Black',9)).pack(anchor='w',padx=10,pady=(9,2))
+        detected=self.game_bridge.game_exe()
+        tk.Label(linkbox,text=f"Detected game: {detected if detected else 'not found yet'}",fg=GREEN if detected else MUTED,bg=PANEL2,font=('Segoe UI',8),wraplength=970,justify='left').pack(anchor='w',padx=10)
+        exe_override_var=tk.StringVar(value=self.conn.execute("SELECT value FROM admin_settings WHERE key='mx_game_exe_override'").fetchone()[0] or '')
+        tk.Label(linkbox,text='GAME EXE OVERRIDE — leave blank for automatic Steam detection',fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(7,2))
+        tk.Entry(linkbox,textvariable=exe_override_var,bg=PANEL,fg=TEXT,insertbackground=TEXT,relief='flat',font=('Segoe UI',9)).pack(fill='x',padx=10,ipady=5)
+        server_host_var=None
+        if self.is_admin():
+            server_host_var=tk.StringVar(value=self.conn.execute("SELECT value FROM admin_settings WHERE key='mx_public_server_host
+
+
+===== FIND RACE =====
+--- needle: FIND A RACE @ 1817 ---
+import os, shutil, threading, tkinter as tk, webbrowser, re
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
+from datetime import datetime
+from .config import VERSION, APP_NAME, APPDATA, load_settings
+from .database import (
+    connect, seed, current_purse, payout_split, fastest_lap_pool,
+    race_financials, wallet_balance, wallet_credit, wallet_debit, wallet_statement,
+    register_with_wallet, setting_float
+)
+from .updater import check_for_update, download_update, launch_update
+from .mx_agent import MXRaceAgent
+from .game_bridge import MXGameBridge, GameBridgeError, ensure_game_bridge_schema
+from .bike_garage import MXBikeGarage, BikeGarageError
+from .windows_taskbar import apply_taskbar_identity, release_taskbar_icons
+from .in_app_garage import InAppGarageRenderer, GarageModelError
+from .track_media import TrackMediaResolver
+from .pricing import apply_low_entry_pricing
+from .subscriptions import (PLANS, ensure_subscription_schema, get_subscription, usage_today, member_quote,
+                            record_member_use, activate_demo_subscription, cancel_auto_renew,
+                            admin_membership_metrics)
+from .commentary import CommentaryDirector
+from .broadcast import WindowsVoiceAnnouncer, VoiceSettings
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = ImageTk = None
+
+BG='#0b0d10'; PANEL='#15191e'; PANEL2='#1d232a'; TEXT='#f3f5f7'; MUTED='#98a2ad'
+ACCENT='#0b84ff'; GOLD='#ffc247'; GREEN='#45d483'; RED='#ff5757'; LINE='#24303c'; BLUE='#20a8ff'
+
+
+APP_USER_MODEL_ID='MXBRaceDayLive.Desktop.v3'
+try:
+    if os.name=='nt':
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+except Exception:
+    pass
+
+NAV = [
+    ('MY PROFILE','PROFILE'),
+    ('GARAGE','GARAGE'),
+    ('FIND A RACE','UPCOMING'),
+    ('LIVE','LIVE'),
+    ('RESULTS','RESULTS'),
+    ('SERIES','CHAMPIONSHIPS'),
+    ('RANKINGS','RANKINGS'),
+    ('ADMIN','ADMIN'),
+]
+
+class RaceDayLiveApp(tk.Tk):
+    def __init__(self):
+        super().__init__(); seed(); self.conn=connect(); apply_low_entry_pricing(self.conn); ensure_subscription_schema(self.conn); self.settings=load_settings(); self.current_rider='Welchy'
+        self.mx_agent=MXRaceAgent(connect,self.current_rider); ensure_game_bridge_schema(self.conn); self.game_bridge=MXGameBridge(self.conn); self.bike_garage=MXBikeGarage(self.conn,self.game_bridge,self.current_rider); self.garage_renderer=InAppGarageRenderer(self.bike_garage); self.track_media=TrackMediaResolver(connect)
+        self.commentary_director=CommentaryDirector(); self.commentary_history=[]; self.commentary_last_event_id=0
+        def _setting(key,default=''):
+            row=self.conn.execute('SELECT value FROM admin_settings WHERE key=?',(key,)).fetchone(); return (row['value'] if row else default)
+        voice_enabled=str(_setting('announcer_spoken_enabled','true')).lower()=='true'
+        try:voice_rate=int(_setting('announcer_voice_rate','2'))
+        except Exception:voice_rate=2
+        self.announcer=WindowsVoiceAnnouncer(VoiceSettings(enabled=voice_enabled,rate=voice_rate,voice_name=_setting('announcer_voice_name','')))
+        self._image_refs=[]; self._photo_cache={}; self._profile_photo_cache={}; self._track_media_mem={}; self._mx_sync_started=False; self.profile_section='OVERVIEW'; self.race_filter='ALL'; self.current_page='PROFILE'
+        self.title(f'{APP_NAME}  v{VERSION}'); self.geometry('1480x900'); self.minsize(1180,760); self.configure(bg=BG)
+        self._taskbar_icon_path=os.path.join(os.path.dirname(os.path.dirname(__file__)),'assets','mxb_race_day_live.ico')
+        self._taskbar_icon=None
+        try:
+            if os.path.isfile(self._taskbar_icon_path):
+                self.iconbitmap(default=self._taskbar_icon_path)
+                if Image is not None and ImageTk is not None:
+                    with Image.open(self._taskbar_icon_path) as icon_im:
+                        icon_im=icon_im.convert('RGBA'); icon_im.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        self._taskbar_icon=ImageTk.PhotoImage(icon_im.copy())
+                    self.iconphoto(True,self._taskbar_icon)
+        except Exception:pass
+        try:self.update_idletasks()
+        except Exception:pass
+        self.after_idle(self._apply_windows_taskbar_icon)
+        self.after(250,self._apply_windows_taskbar_icon)
+        self.after(1000,self._apply_windows_taskbar_icon)
+        try:self.bind('<Map>',lambda e:self.after_idle(self._apply_windows_taskbar_icon),add='+')
+        except Exception:pass
+        self._styles(); self._layout(); self.show('PROFILE')
+        self.protocol('WM_DELETE_WINDOW',self._on_close)
+        self.after(650,self._start_mx_sync)
+        if self.settings.get('auto_check_updates'): self.after(1300,self._silent_update_check)
+
+    def _styles(self):
+        s=ttk.Style(self); s.theme_use('clam')
+        s.configure('Treeview',background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=34,bordercolor=LINE,font=('Segoe UI',10))
+        s.configure('Treeview.Heading',background=PANEL2,foreground=TEXT,font=('Segoe UI Semibold',10),relief='flat')
+        s.map('Treeview',background=[('selected','#2d3944')])
+        s.configure('TNotebook',background=BG,borderwidth=0); s.configure('TNotebook.Tab',padding=(14,8))
+
+    def _layout(self):
+        header=tk.Frame(self,bg=BG,height=74); header.pack(fill='x'); header.pack_propagate(False)
+        brand=tk.Frame(header,bg=BG); brand.pack(side='left',padx=24)
+        tk.Label(brand,text='MXB',fg=TEXT,bg=BG,font=('Segoe UI Black',26,'italic')).pack(side='left')
+        tk.Label(brand,text=' RACE DAY',fg=TEXT,bg=BG,font=('Segoe UI Black',22)).pack(side='left')
+        tk.Label(brand,text=' LIVE',fg=ACCENT,bg=BG,font=('Segoe UI Black',22,'italic')).pack(side='left')
+        self.update_btn=tk.Button(header,text='UPDATE',command=self.do_update,bg=ACCENT,fg='white',activebackground='#ff7a30',relief='flat',font=('Segoe UI Semibold',10),padx=18,pady=8,cursor='hand2'); self.update_btn.pack(side='right',padx=24,pady=18)
+        tk.Label(header,text=f'v{VERSION}',fg=MUTED,bg=BG,font=('Segoe UI',9)).pack(side='right')
+        tk.Frame(self,bg=ACCENT,height=3).pack(fill='x')
+        body=tk.Frame(self,bg=BG); body.pack(fill='both',expand=
+
+--- needle: Find a Race @ 1817 ---
+import os, shutil, threading, tkinter as tk, webbrowser, re
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
+from datetime import datetime
+from .config import VERSION, APP_NAME, APPDATA, load_settings
+from .database import (
+    connect, seed, current_purse, payout_split, fastest_lap_pool,
+    race_financials, wallet_balance, wallet_credit, wallet_debit, wallet_statement,
+    register_with_wallet, setting_float
+)
+from .updater import check_for_update, download_update, launch_update
+from .mx_agent import MXRaceAgent
+from .game_bridge import MXGameBridge, GameBridgeError, ensure_game_bridge_schema
+from .bike_garage import MXBikeGarage, BikeGarageError
+from .windows_taskbar import apply_taskbar_identity, release_taskbar_icons
+from .in_app_garage import InAppGarageRenderer, GarageModelError
+from .track_media import TrackMediaResolver
+from .pricing import apply_low_entry_pricing
+from .subscriptions import (PLANS, ensure_subscription_schema, get_subscription, usage_today, member_quote,
+                            record_member_use, activate_demo_subscription, cancel_auto_renew,
+                            admin_membership_metrics)
+from .commentary import CommentaryDirector
+from .broadcast import WindowsVoiceAnnouncer, VoiceSettings
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = ImageTk = None
+
+BG='#0b0d10'; PANEL='#15191e'; PANEL2='#1d232a'; TEXT='#f3f5f7'; MUTED='#98a2ad'
+ACCENT='#0b84ff'; GOLD='#ffc247'; GREEN='#45d483'; RED='#ff5757'; LINE='#24303c'; BLUE='#20a8ff'
+
+
+APP_USER_MODEL_ID='MXBRaceDayLive.Desktop.v3'
+try:
+    if os.name=='nt':
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+except Exception:
+    pass
+
+NAV = [
+    ('MY PROFILE','PROFILE'),
+    ('GARAGE','GARAGE'),
+    ('FIND A RACE','UPCOMING'),
+    ('LIVE','LIVE'),
+    ('RESULTS','RESULTS'),
+    ('SERIES','CHAMPIONSHIPS'),
+    ('RANKINGS','RANKINGS'),
+    ('ADMIN','ADMIN'),
+]
+
+class RaceDayLiveApp(tk.Tk):
+    def __init__(self):
+        super().__init__(); seed(); self.conn=connect(); apply_low_entry_pricing(self.conn); ensure_subscription_schema(self.conn); self.settings=load_settings(); self.current_rider='Welchy'
+        self.mx_agent=MXRaceAgent(connect,self.current_rider); ensure_game_bridge_schema(self.conn); self.game_bridge=MXGameBridge(self.conn); self.bike_garage=MXBikeGarage(self.conn,self.game_bridge,self.current_rider); self.garage_renderer=InAppGarageRenderer(self.bike_garage); self.track_media=TrackMediaResolver(connect)
+        self.commentary_director=CommentaryDirector(); self.commentary_history=[]; self.commentary_last_event_id=0
+        def _setting(key,default=''):
+            row=self.conn.execute('SELECT value FROM admin_settings WHERE key=?',(key,)).fetchone(); return (row['value'] if row else default)
+        voice_enabled=str(_setting('announcer_spoken_enabled','true')).lower()=='true'
+        try:voice_rate=int(_setting('announcer_voice_rate','2'))
+        except Exception:voice_rate=2
+        self.announcer=WindowsVoiceAnnouncer(VoiceSettings(enabled=voice_enabled,rate=voice_rate,voice_name=_setting('announcer_voice_name','')))
+        self._image_refs=[]; self._photo_cache={}; self._profile_photo_cache={}; self._track_media_mem={}; self._mx_sync_started=False; self.profile_section='OVERVIEW'; self.race_filter='ALL'; self.current_page='PROFILE'
+        self.title(f'{APP_NAME}  v{VERSION}'); self.geometry('1480x900'); self.minsize(1180,760); self.configure(bg=BG)
+        self._taskbar_icon_path=os.path.join(os.path.dirname(os.path.dirname(__file__)),'assets','mxb_race_day_live.ico')
+        self._taskbar_icon=None
+        try:
+            if os.path.isfile(self._taskbar_icon_path):
+                self.iconbitmap(default=self._taskbar_icon_path)
+                if Image is not None and ImageTk is not None:
+                    with Image.open(self._taskbar_icon_path) as icon_im:
+                        icon_im=icon_im.convert('RGBA'); icon_im.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        self._taskbar_icon=ImageTk.PhotoImage(icon_im.copy())
+                    self.iconphoto(True,self._taskbar_icon)
+        except Exception:pass
+        try:self.update_idletasks()
+        except Exception:pass
+        self.after_idle(self._apply_windows_taskbar_icon)
+        self.after(250,self._apply_windows_taskbar_icon)
+        self.after(1000,self._apply_windows_taskbar_icon)
+        try:self.bind('<Map>',lambda e:self.after_idle(self._apply_windows_taskbar_icon),add='+')
+        except Exception:pass
+        self._styles(); self._layout(); self.show('PROFILE')
+        self.protocol('WM_DELETE_WINDOW',self._on_close)
+        self.after(650,self._start_mx_sync)
+        if self.settings.get('auto_check_updates'): self.after(1300,self._silent_update_check)
+
+    def _styles(self):
+        s=ttk.Style(self); s.theme_use('clam')
+        s.configure('Treeview',background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=34,bordercolor=LINE,font=('Segoe UI',10))
+        s.configure('Treeview.Heading',background=PANEL2,foreground=TEXT,font=('Segoe UI Semibold',10),relief='flat')
+        s.map('Treeview',background=[('selected','#2d3944')])
+        s.configure('TNotebook',background=BG,borderwidth=0); s.configure('TNotebook.Tab',padding=(14,8))
+
+    def _layout(self):
+        header=tk.Frame(self,bg=BG,height=74); header.pack(fill='x'); header.pack_propagate(False)
+        brand=tk.Frame(header,bg=BG); brand.pack(side='left',padx=24)
+        tk.Label(brand,text='MXB',fg=TEXT,bg=BG,font=('Segoe UI Black',26,'italic')).pack(side='left')
+        tk.Label(brand,text=' RACE DAY',fg=TEXT,bg=BG,font=('Segoe UI Black',22)).pack(side='left')
+        tk.Label(brand,text=' LIVE',fg=ACCENT,bg=BG,font=('Segoe UI Black',22,'italic')).pack(side='left')
+        self.update_btn=tk.Button(header,text='UPDATE',command=self.do_update,bg=ACCENT,fg='white',activebackground='#ff7a30',relief='flat',font=('Segoe UI Semibold',10),padx=18,pady=8,cursor='hand2'); self.update_btn.pack(side='right',padx=24,pady=18)
+        tk.Label(header,text=f'v{VERSION}',fg=MUTED,bg=BG,font=('Segoe UI',9)).pack(side='right')
+        tk.Frame(self,bg=ACCENT,height=3).pack(fill='x')
+        body=tk.Frame(self,bg=BG); body.pack(fill='both',expand=
+
+--- needle: JOIN RACE SERVER @ 74044 ---
+:,.2f}" for i,amt in enumerate(payouts)) if payouts else 'Payouts grow as paid riders enter.'
+        tk.Label(hero,text=f"CURRENT PROJECTED PAYOUTS: {paytxt}\nFASTEST LAP BONUS: ${fast:,.2f} • FINAL PURSE LOCKS BEFORE THE GATE DROPS",fg=GOLD,bg=PANEL,font=('Segoe UI Semibold',9),justify='left').pack(anchor='w',padx=16,pady=(0,8))
+        tk.Label(hero,text='ALL PAID RACE ENTRIES ARE FINAL • NO REFUNDS',fg=RED,bg=PANEL,font=('Segoe UI Black',9)).pack(anchor='w',padx=16,pady=(0,12))
+        if not ok:tk.Label(hero,text=f"LOCKED — requires {race['min_skill']}–{race['max_skill']} MMR and Racecraft {race['min_racecraft']}+.",fg=RED,bg=PANEL,font=('Segoe UI Black',10)).pack(anchor='w',padx=16,pady=(0,12))
+        roster=self.card(body); roster.pack(fill='x',pady=12)
+        tk.Label(roster,text='SIGNED UP RIDERS',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        cols=('Rider','Bike','Size','Signed Up','Skill','Etiquette'); tree=ttk.Treeview(roster,columns=cols,show='headings',height=7)
+        for c in cols:tree.heading(c,text=c); tree.column(c,width=150 if c!='Rider' else 210,anchor='center')
+        for x in self.conn.execute('''SELECT rd.*,rg.signed_up_at FROM registrations rg JOIN riders rd ON rd.id=rg.rider_id WHERE rg.race_id=? AND rg.payment_status='PAID' ORDER BY rg.signed_up_at''',(race['id'],)):
+            tree.insert('', 'end',values=(f"#{x['number']} {x['username']}",x['bike_model'],x['bike_size'],datetime.fromisoformat(x['signed_up_at']).strftime('%m/%d %I:%M %p'),f"{x['skill_class']} {x['skill_rating']}",f"{x['racecraft_grade']} {x['racecraft_score']}"))
+        tree.pack(fill='x',padx=14,pady=(0,12))
+        quote=member_quote(self.conn,rider['id'],race)
+        already=self.conn.execute('SELECT 1 FROM registrations WHERE race_id=? AND rider_id=?',(race['id'],rider['id'])).fetchone()
+        if already:text,state,color='✓ YOU ARE REGISTERED','disabled',GREEN
+        elif ok and quote['eligible']:text,state,color=f"ENTER RACE • MEMBER ${quote['member_price']:.2f}",'normal',GREEN
+        elif ok:text,state,color=f"ENTER RACE • ${race['entry_fee']:.2f}",'normal',ACCENT
+        else:text,state,color='RACE LOCKED','disabled',LINE
+        tk.Button(body,text=text,command=lambda:self.signup_demo(race),state=state,bg=color,fg='white',relief='flat',font=('Segoe UI Black',12),pady=12,cursor='hand2').pack(fill='x',pady=(0,14))
+        if already:self._race_day_launcher(body,race,rider)
+
+
+    def _launch_mx_game(self):
+        try:
+            result=self.game_bridge.launch_game()
+            try:self.mx_status_label.configure(text='● MX BIKES LAUNCHED',fg=GREEN)
+            except Exception:pass
+            return result
+        except GameBridgeError as exc:
+            messagebox.showerror('MX Bikes',str(exc))
+        except Exception as exc:
+            messagebox.showerror('MX Bikes',f'Could not launch MX Bikes: {exc}')
+
+    def _join_race_server(self,race_id,rider_id):
+        try:
+            result=self.game_bridge.launch_race(race_id,rider_id)
+            messagebox.showinfo('Race Day Live',f"Launching MX Bikes directly into {result['endpoint']}.")
+        except GameBridgeError as exc:
+            messagebox.showerror('Race Day',str(exc))
+        except Exception as exc:
+            messagebox.showerror('Race Day',f'Could not join the MX Bikes race server: {exc}')
+
+    def _save_race_bike_choice(self,race_id,rider_id,label,bike_map):
+        item=bike_map.get(label)
+        if not item:
+            messagebox.showerror('Race Bike','Choose a bike from your synced MX Bikes library first.'); return
+        try:
+            saved=self.game_bridge.select_bike(race_id,rider_id,item['content_id'],item['display_name'])
+            messagebox.showinfo('Race Bike',f"{saved['display_name']} is locked in for this race. Race Day Live will pass that selection into the server registration.")
+            self.open_race_details(race_id)
+        except GameBridgeError as exc:messagebox.showerror('Race Bike',str(exc))
+        except Exception as exc:messagebox.showerror('Race Bike',f'Could not save race bike: {exc}')
+
+    def _race_day_launcher(self,parent,race,rider):
+        launch=self.card(parent); launch.pack(fill='x',pady=(0,16))
+        tk.Label(launch,text='RACE DAY LAUNCHER',fg=ACCENT,bg=PANEL,font=('Segoe UI Black',15)).pack(anchor='w',padx=16,pady=(14,2))
+        tk.Label(launch,text='Race Day Live is linked to MX Bikes. Pick your bike before race time; when the server opens, JOIN RACE SERVER launches MX Bikes directly into it.',fg=MUTED,bg=PANEL,font=('Segoe UI',9),wraplength=1030,justify='left').pack(anchor='w',padx=16,pady=(0,10))
+        status=self.game_bridge.status(race['id'],rider['id']); target=status['target']; selected=status['selected_bike']
+        row=tk.Frame(launch,bg=PANEL2); row.pack(fill='x',padx=14,pady=(0,10))
+        game_text='MX BIKES READY' if status['game_found'] else 'MX BIKES NOT FOUND'
+        tk.Label(row,text=game_text,fg=GREEN if status['game_found'] else RED,bg=PANEL2,font=('Segoe UI Black',9)).pack(side='left',padx=10,pady=10)
+        if target.get('ready'):
+            server_text=f"SERVER OPEN • {target.get('endpoint','')}"
+            server_color=GREEN
+        elif not target.get('host'):
+            server_text='SERVER ADDRESS PENDING'
+            server_color=GOLD
+        else:
+            server_text=f"SERVER {target.get('status','PREPARING')}"
+            server_color=GOLD
+        tk.Label(row,text=server_text,fg=server_color,bg=PANEL2,font=('Segoe UI Black',9)).pack(side='right',padx=10)
+
+        bikes=status['bike_count'] and self.game_bridge.bikes() or []
+        if bikes:
+            picker=tk.Frame(launch,bg=PANEL); picker.pack(fill='x',padx=16,pady=(0,10))
+            tk.Label(picker,text='YOUR BIKE FOR THIS RACE',fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(anchor='w')
+            bike_map={}
+            for item in bikes:
+                label=f"{item['display_name']}  [{item['content_id']}]"
+                bike_map[label]=item
+            labels=list(bike_map.keys())
+            current=''
+            if selected:
+                for label,item in bike_map.items():
+                    if item['content_id']==selected.get('content_id') or item['display_name']==selected.get('display_name'):
+                        current=label; break
+            if not current and rider['game_bike_id']:
+                for label,item in bike_map.items():
+                    if item['content_id']==rider['game_bike_id']:
+                        current=label; break
+            bike_var=tk.StringVar(value=current)
+            combo=ttk.Combobox(picker,textvariable=bike_var,values=labels,state='readonly',font=('Segoe UI',10)); combo.pack(side='left',fill='x',expand=True,ipady=5,pady=(4,0))
+            tk.Button(picker,text='SAVE RACE BIKE',command=lambda:self._save_race_bike_choice(race['id'],rider['id'],bike_var.get(),bike_map),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Black',9),padx=13,pady=8,cursor='hand2').pack(side='left',padx=(8,0),pady=(4,0))
+            if selected:tk.Label(launch,text=f"LOCKED IN: {selected['display_name']}",fg=GREEN,bg=PANEL,font=('Segoe UI Black',9)).pack(anchor='w',padx=16,pady=(0,8))
+        else:
+            tk.Label(launch,text='No bikes are in the synced game library yet. Race Day Live will keep syncing MX Bikes automatically.',fg=GOLD,bg=PANEL,font=('Segoe UI Semibold',9)).pack(anchor='w',padx=16,pady=(0,8))
+
+        actions=tk.Frame(launch,bg=PANEL); actions.pack(fill='x',padx=14,pady=(0,14))
+        if target.get('ready'):
+            tk.Button(actions,text='JOIN RACE SERVER',command=lambda:self._join_race_server(race['id'],rider['id']),bg=GREEN,fg='white',activebackground='#50df91',relief='flat',font=('Segoe UI Black',12),pady=12,cursor='hand2').pack(side='left',fill='x',expand=True,padx=(0,6))
+        else:
+            tk.Button(actions,text='LAUNCH MX BIKES',command=self._launch_mx_game,bg=ACCENT,fg='white',relief='flat',font=('Segoe UI Black',11),pady=12,cursor='hand2').pack(side='left',fill='x',expand=True,padx=(0,6))
+        tk.Button(actions,text='SYNC NOW',command=self._run_mx_sync,bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Black',9),padx=15,pady=12,cursor='hand2').pack(side='left',padx=(6,0))
+
+    def signup_demo(self,race):
+        rider=self.rider()
+        if self.conn.execute('SELECT 1 FROM registrations WHERE race_id=? AND rider_id=?',(race['id'],rider['id'])).fetchone(): messagebox.showinfo('Already Registered','You are already registered for this race.'); return
+        if not self.eligible(race,rider): messagebox.showerror('Race Locked','Your current skill/etiquette rating does not qualify for this lobby.'); return
+        quote=member_quote(self.conn,rider['id'],race); member_entry=quote['member_price'] if quote['eligible'] else float(race['entry_fee'])
+        bal=wallet_balance(self.conn,rider['id']); paid,purse=current_purse(self.conn,race['id']); fast=fastest_lap_pool(self.conn,race['
+
+--- needle: signup @ 34923 ---
+ Black',38)).pack(anchor='w')
+        tk.Label(top,text='Available for race entries',fg=TEXT,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w')
+        quick=tk.Frame(top,bg=PANEL); quick.pack(anchor='w',pady=(14,0))
+        for amt in (10,25,50,100):
+            tk.Button(quick,text=f'+ ${amt}',command=lambda a=amt:self._wallet_quick_add(a),bg=ACCENT if amt==25 else PANEL2,fg='white' if amt==25 else TEXT,relief='flat',font=('Segoe UI Black',9),padx=14,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+        tk.Button(quick,text='CUSTOM AMOUNT',command=self.add_funds_dialog,bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),padx=14,pady=8,cursor='hand2').pack(side='left')
+        tk.Label(hero,text='No-refund race entry policy: once a race entry is purchased, it is final except where mandatory law or payment-network rules require otherwise. Wallet funding is in DEMO MODE until an approved real-money provider is connected.',fg=MUTED,bg=PANEL,font=('Segoe UI',8),wraplength=1050,justify='left').pack(anchor='w',padx=18,pady=(0,16))
+        statement=self.card(body); statement.pack(fill='x')
+        tk.Label(statement,text='WALLET ACTIVITY',fg=TEXT,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,7))
+        cols=('Date','Activity','Race','Amount','Balance'); t=ttk.Treeview(statement,columns=cols,show='headings',height=12)
+        for c,w in [('Date',170),('Activity',150),('Race',330),('Amount',120),('Balance',120)]:t.heading(c,text=c); t.column(c,width=w,anchor='w' if c in ('Activity','Race') else 'center')
+        for x in wallet_statement(self.conn,r['id'],100):
+            try: dt=datetime.fromisoformat(x['created_at']).strftime('%b %d, %Y %I:%M %p')
+            except Exception: dt=x['created_at']
+            t.insert('', 'end',values=(dt,x['kind'].replace('_',' ').title(),x['race_name'] or x['note'] or '—',f"{x['amount_cents']/100:+.2f}",f"${x['balance_after_cents']/100:.2f}"))
+        t.pack(fill='x',padx=14,pady=(0,14))
+
+    def _wallet_quick_add(self,amount):
+        r=self.rider()
+        try:
+            wallet_credit(self.conn,r['id'],float(amount),kind='TOP_UP',provider='DEMO',note='Demo wallet top-up')
+            self._set_profile_section('WALLET')
+        except Exception as e: messagebox.showerror('Race Wallet',str(e))
+
+
+    def _profile_membership(self,r):
+        body=self._scrollable(self.content,pady=(0,24))
+        sub=get_subscription(self.conn,r['id']); used=usage_today(self.conn,r['id'])
+        tk.Label(body,text='RACE MEMBERSHIP',fg=TEXT,bg=BG,font=('Segoe UI Black',20)).pack(anchor='w',pady=(4,2))
+        tk.Label(body,text='Save on Community races with automatic daily limits. Cash and Premier events always keep their normal entry price.',fg=MUTED,bg=BG,font=('Segoe UI',10),wraplength=1050,justify='left').pack(anchor='w',pady=(0,12))
+        status=self.card(body); status.pack(fill='x',pady=(0,12))
+        if sub and sub.get('active') and sub.get('plan'):
+            plan=sub['plan']; remaining=max(0,int(plan['daily_races'])-used)
+            tk.Label(status,text=f"{plan['name'].upper()} • ACTIVE",fg=GREEN,bg=PANEL,font=('Segoe UI Black',14)).pack(anchor='w',padx=16,pady=(14,3))
+            tk.Label(status,text=f"${plan['monthly_price']:.2f}/month  •  Community ${plan['community_price']:.2f}  •  {remaining}/{plan['daily_races']} member-priced races remaining today",fg=TEXT,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w',padx=16,pady=(0,4))
+            try: renewal=datetime.fromisoformat(sub['current_period_end']).strftime('%b %d, %Y')
+            except Exception: renewal=sub.get('current_period_end','—')
+            renew='AUTO-RENEW ON' if int(sub.get('auto_renew') or 0) else 'AUTO-RENEW OFF'
+            tk.Label(status,text=f"{renew}  •  Current period through {renewal}  •  Provider: {sub.get('provider') or 'NOT CONNECTED'}",fg=MUTED,bg=PANEL,font=('Segoe UI',9)).pack(anchor='w',padx=16,pady=(0,10))
+            if int(sub.get('auto_renew') or 0):
+                tk.Button(status,text='TURN OFF AUTO-RENEW',command=lambda:self._cancel_membership_renewal(r['id']),bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Semibold',9),padx=12,pady=8,cursor='hand2').pack(anchor='w',padx=16,pady=(0,14))
+        else:
+            tk.Label(status,text='NO ACTIVE MEMBERSHIP',fg=MUTED,bg=PANEL,font=('Segoe UI Black',13)).pack(anchor='w',padx=16,pady=(14,3))
+            tk.Label(status,text='Pick a plan below. Membership discounts are enforced automatically at race signup.',fg=MUTED,bg=PANEL,font=('Segoe UI',9)).pack(anchor='w',padx=16,pady=(0,14))
+
+        plans=tk.Frame(body,bg=BG); plans.pack(fill='x')
+        for key in ('PIT','RACE','FACTORY'):
+            plan=PLANS[key]
+            card=self.card(plans); card.pack(side='left',fill='both',expand=True,padx=(0,8) if key!='FACTORY' else 0)
+            tk.Label(card,text=plan['name'].upper(),fg=ACCENT if key!='FACTORY' else GOLD,bg=PANEL,font=('Segoe UI Black',14)).pack(anchor='w',padx=16,pady=(15,2))
+            tk.Label(card,text=f"${plan['monthly_price']:.2f} / MONTH",fg=TEXT,bg=PANEL,font=('Segoe UI Black',20)).pack(anchor='w',padx=16)
+            tk.Label(card,text=f"{plan['daily_races']} discounted Community race{'s' if plan['daily_races']!=1 else ''} per day",fg=TEXT,bg=PANEL,font=('Segoe UI Semibold',9)).pack(anchor='w',padx=16,pady=(8,2))
+            tk.Label(card,text=f"Member Community entry: ${plan['community_price']:.2f}",fg=GREEN,bg=PANEL,font=('Segoe UI Black',10)).pack(anchor='w',padx=16,pady=2)
+            tk.Label(card,text='After the daily allowance: normal $3 Community price. Cash/Premier: normal price.',fg=MUTED,bg=PANEL,font=('Segoe UI',8),wraplength=290,justify='left').pack(anchor='w',padx=16,pady=(2,10))
+            active=bool(sub and sub.get('active') and sub.get('plan_key')==key)
+            label='CURRENT PLAN' if active else ('SWITCH TO '+plan['name'].upper() if sub and sub.get('active') else 'ACTIVATE DEMO '+plan['name'].upper())
+            tk.Button(card,text=label,state='disabled' if active else 'normal',command=lambda k=key:self._activate_membership_demo(r['id'],k),bg=GREEN if active else ACCENT,fg='white',relief='flat',font=('Segoe UI Black',9),pady=9,cursor='hand2').pack(fill='x',padx=14,pady=(2,14))
+
+        note=self.card(body); note.pack(fill='x',pady=(12,0))
+        tk.Label(note,text='AUTOMATION STATUS',fg=ACCENT,bg=PANEL,font=('Segoe UI Black',11)).pack(anchor='w',padx=16,pady=(14,5))
+        tk.Label(note,text='Daily member limits, member pricing, wallet rebates, plan status, usage tracking and renewal periods are automatic. The app wallet and membership billing are still in DEMO MODE until a real recurring-payment provider is connected; production billing will use the provider fields already built into this system.',fg=MUTED,bg=PANEL,font=('Segoe UI',9),wraplength=1040,justify='left').pack(anchor='w',padx=16,pady=(0,14))
+
+    def _activate_membership_demo(self,rider_id,plan_key):
+        plan=PLANS[plan_key]
+        if not messagebox.askyesno('Membership Demo',f"Activate {plan['name']} in DEMO billing mode?\n\nProduction recurring billing is not connected yet."):
+            return
+        activate_demo_subscription(self.conn,rider_id,plan_key)
+        messagebox.showinfo('Membership',f"{plan['name']} is active in DEMO mode. Daily member pricing is now enforced automatically.")
+        self._set_profile_section('MEMBERSHIP')
+
+    def _cancel_membership_renewal(self,rider_id):
+        cancel_auto_renew(self.conn,rider_id)
+        messagebox.showinfo('Membership','Auto-renew is off. Membership remains active through the current period.')
+        self._set_profile_section('MEMBERSHIP')
+
+
+    def page_garage(self):
+        r=self.rider()
+        self.bike_garage.username=self.current_rider
+        return self._profile_bikes(r)
+
+    def _profile_bikes(self,r):
+        body=self._scrollable(self.content,pady=(0,24))
+        tk.Label(body,text='GARAGE',fg=TEXT,bg=BG,font=('Segoe UI Black',22,'italic')).pack(anchor='w',pady=(4,2))
+        tk.Label(body,text='Your complete MX Bikes garage inside Race Day Live. Every installed bike remains selectable, including EDF-only bikes, and the live 3D surface is hosted directly on this page. Bike, paint, helmet, rider kit, gloves, boots and protection stay synchronized with the native MX Bikes profile.',fg=MUTED,bg=BG,font=('Segoe UI',10),wraplength=1080,justify='left').pack(anchor='w',pady=(0,12))
+        self.bike_garage.username=self.current_rider
+        diag=self.bike_garage.diagnostics(); current=self.bike_garage.read_selection(); records=self.bike_garage.bike_records()
+        by_id={x['id']:x for x in records}
+        if current.get('bikeid') and current['bikeid'] in by_id:category=by_id[current['bikeid']]['category']
+        else:category=(records[0]['category'] if records else 'OTHER')
+        state=dict(current); state['category']=category
+        if not state.get('rider'):state['rider']='default_mx'
+        if not state.get('helmet'):state
+
+
+===== WALLET UI =====
+--- needle: WALLET @ 336 ---
+import os, shutil, threading, tkinter as tk, webbrowser, re
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
+from datetime import datetime
+from .config import VERSION, APP_NAME, APPDATA, load_settings
+from .database import (
+    connect, seed, current_purse, payout_split, fastest_lap_pool,
+    race_financials, wallet_balance, wallet_credit, wallet_debit, wallet_statement,
+    register_with_wallet, setting_float
+)
+from .updater import check_for_update, download_update, launch_update
+from .mx_agent import MXRaceAgent
+from .game_bridge import MXGameBridge, GameBridgeError, ensure_game_bridge_schema
+from .bike_garage import MXBikeGarage, BikeGarageError
+from .windows_taskbar import apply_taskbar_identity, release_taskbar_icons
+from .in_app_garage import InAppGarageRenderer, GarageModelError
+from .track_media import TrackMediaResolver
+from .pricing import apply_low_entry_pricing
+from .subscriptions import (PLANS, ensure_subscription_schema, get_subscription, usage_today, member_quote,
+                            record_member_use, activate_demo_subscription, cancel_auto_renew,
+                            admin_membership_metrics)
+from .commentary import CommentaryDirector
+from .broadcast import WindowsVoiceAnnouncer, VoiceSettings
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = ImageTk = None
+
+BG='#0b0d10'; PANEL='#15191e'; PANEL2='#1d232a'; TEXT='#f3f5f7'; MUTED='#98a2ad'
+ACCENT='#0b84ff'; GOLD='#ffc247'; GREEN='#45d483'; RED='#ff5757'; LINE='#24303c'; BLUE='#20a8ff'
+
+
+APP_USER_MODEL_ID='MXBRaceDayLive.Desktop.v3'
+try:
+    if os.name=='nt':
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+except Exception:
+    pass
+
+NAV = [
+    ('MY PROFILE','PROFILE'),
+    ('GARAGE','GARAGE'),
+    ('FIND A RACE','UPCOMING'),
+    ('LIVE','LIVE'),
+    ('RESULTS','RESULTS'),
+    ('SERIES','CHAMPIONSHIPS'),
+    ('RANKINGS','RANKINGS'),
+    ('ADMIN','ADMIN'),
+]
+
+class RaceDayLiveApp(tk.Tk):
+    def __init__(self):
+        super().__init__(); seed(); self.conn=connect(); apply_low_entry_pricing(self.conn); ensure_subscription_schema(self.conn); self.settings=load_settings(); self.current_rider='Welchy'
+        self.mx_agent=MXRaceAgent(connect,self.current_rider); ensure_game_bridge_schema(self.conn); self.game_bridge=MXGameBridge(self.conn); self.bike_garage=MXBikeGarage(self.conn,self.game_bridge,self.current_rider); self.garage_renderer=InAppGarageRenderer(self.bike_garage); self.track_media=TrackMediaResolver(connect)
+        self.commentary_director=CommentaryDirector(); self.commentary_history=[]; self.commentary_last_event_id=0
+        def _setting(key,default=''):
+            row=self.conn.execute('SELECT value FROM admin_settings WHERE key=?',(key,)).fetchone(); return (row['value'] if row else default)
+        voice_enabled=str(_setting('announcer_spoken_enabled','true')).lower()=='true'
+        try:voice_rate=int(_setting('announcer_voice_rate','2'))
+        except Exception:voice_rate=2
+        self.announcer=WindowsVoiceAnnouncer(VoiceSettings(enabled=voice_enabled,rate=voice_rate,voice_name=_setting('announcer_voice_name','')))
+        self._image_refs=[]; self._photo_cache={}; self._profile_photo_cache={}; self._track_media_mem={}; self._mx_sync_started=False; self.profile_section='OVERVIEW'; self.race_filter='ALL'; self.current_page='PROFILE'
+        self.title(f'{APP_NAME}  v{VERSION}'); self.geometry('1480x900'); self.minsize(1180,760); self.configure(bg=BG)
+        self._taskbar_icon_path=os.path.join(os.path.dirname(os.path.dirname(__file__)),'assets','mxb_race_day_live.ico')
+        self._taskbar_icon=None
+        try:
+            if os.path.isfile(self._taskbar_icon_path):
+                self.iconbitmap(default=self._taskbar_icon_path)
+                if Image is not None and ImageTk is not None:
+                    with Image.open(self._taskbar_icon_path) as icon_im:
+                        icon_im=icon_im.convert('RGBA'); icon_im.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        self._taskbar_icon=ImageTk.PhotoImage(icon_im.copy())
+                    self.iconphoto(True,self._taskbar_icon)
+        except Exception:pass
+        try:self.update_idletasks()
+        except Exception:pass
+        self.after_idle(self._apply_windows_taskbar_icon)
+        self.after(250,self._apply_windows_taskbar_icon)
+        self.after(1000,self._apply_windows_taskbar_icon)
+        try:self.bind('<Map>',lambda e:self.after_idle(self._apply_windows_taskbar_icon),add='+')
+        except Exception:pass
+        self._styles(); self._layout(); self.show('PROFILE')
+        self.protocol('WM_DELETE_WINDOW',self._on_close)
+        self.after(650,self._start_mx_sync)
+        if self.settings.get('auto_check_updates'): self.after(1300,self._silent_upd
+
+--- needle: balance @ 343 ---
+import os, shutil, threading, tkinter as tk, webbrowser, re
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
+from datetime import datetime
+from .config import VERSION, APP_NAME, APPDATA, load_settings
+from .database import (
+    connect, seed, current_purse, payout_split, fastest_lap_pool,
+    race_financials, wallet_balance, wallet_credit, wallet_debit, wallet_statement,
+    register_with_wallet, setting_float
+)
+from .updater import check_for_update, download_update, launch_update
+from .mx_agent import MXRaceAgent
+from .game_bridge import MXGameBridge, GameBridgeError, ensure_game_bridge_schema
+from .bike_garage import MXBikeGarage, BikeGarageError
+from .windows_taskbar import apply_taskbar_identity, release_taskbar_icons
+from .in_app_garage import InAppGarageRenderer, GarageModelError
+from .track_media import TrackMediaResolver
+from .pricing import apply_low_entry_pricing
+from .subscriptions import (PLANS, ensure_subscription_schema, get_subscription, usage_today, member_quote,
+                            record_member_use, activate_demo_subscription, cancel_auto_renew,
+                            admin_membership_metrics)
+from .commentary import CommentaryDirector
+from .broadcast import WindowsVoiceAnnouncer, VoiceSettings
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = ImageTk = None
+
+BG='#0b0d10'; PANEL='#15191e'; PANEL2='#1d232a'; TEXT='#f3f5f7'; MUTED='#98a2ad'
+ACCENT='#0b84ff'; GOLD='#ffc247'; GREEN='#45d483'; RED='#ff5757'; LINE='#24303c'; BLUE='#20a8ff'
+
+
+APP_USER_MODEL_ID='MXBRaceDayLive.Desktop.v3'
+try:
+    if os.name=='nt':
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+except Exception:
+    pass
+
+NAV = [
+    ('MY PROFILE','PROFILE'),
+    ('GARAGE','GARAGE'),
+    ('FIND A RACE','UPCOMING'),
+    ('LIVE','LIVE'),
+    ('RESULTS','RESULTS'),
+    ('SERIES','CHAMPIONSHIPS'),
+    ('RANKINGS','RANKINGS'),
+    ('ADMIN','ADMIN'),
+]
+
+class RaceDayLiveApp(tk.Tk):
+    def __init__(self):
+        super().__init__(); seed(); self.conn=connect(); apply_low_entry_pricing(self.conn); ensure_subscription_schema(self.conn); self.settings=load_settings(); self.current_rider='Welchy'
+        self.mx_agent=MXRaceAgent(connect,self.current_rider); ensure_game_bridge_schema(self.conn); self.game_bridge=MXGameBridge(self.conn); self.bike_garage=MXBikeGarage(self.conn,self.game_bridge,self.current_rider); self.garage_renderer=InAppGarageRenderer(self.bike_garage); self.track_media=TrackMediaResolver(connect)
+        self.commentary_director=CommentaryDirector(); self.commentary_history=[]; self.commentary_last_event_id=0
+        def _setting(key,default=''):
+            row=self.conn.execute('SELECT value FROM admin_settings WHERE key=?',(key,)).fetchone(); return (row['value'] if row else default)
+        voice_enabled=str(_setting('announcer_spoken_enabled','true')).lower()=='true'
+        try:voice_rate=int(_setting('announcer_voice_rate','2'))
+        except Exception:voice_rate=2
+        self.announcer=WindowsVoiceAnnouncer(VoiceSettings(enabled=voice_enabled,rate=voice_rate,voice_name=_setting('announcer_voice_name','')))
+        self._image_refs=[]; self._photo_cache={}; self._profile_photo_cache={}; self._track_media_mem={}; self._mx_sync_started=False; self.profile_section='OVERVIEW'; self.race_filter='ALL'; self.current_page='PROFILE'
+        self.title(f'{APP_NAME}  v{VERSION}'); self.geometry('1480x900'); self.minsize(1180,760); self.configure(bg=BG)
+        self._taskbar_icon_path=os.path.join(os.path.dirname(os.path.dirname(__file__)),'assets','mxb_race_day_live.ico')
+        self._taskbar_icon=None
+        try:
+            if os.path.isfile(self._taskbar_icon_path):
+                self.iconbitmap(default=self._taskbar_icon_path)
+                if Image is not None and ImageTk is not None:
+                    with Image.open(self._taskbar_icon_path) as icon_im:
+                        icon_im=icon_im.convert('RGBA'); icon_im.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        self._taskbar_icon=ImageTk.PhotoImage(icon_im.copy())
+                    self.iconphoto(True,self._taskbar_icon)
+        except Exception:pass
+        try:self.update_idletasks()
+        except Exception:pass
+        self.after_idle(self._apply_windows_taskbar_icon)
+        self.after(250,self._apply_windows_taskbar_icon)
+        self.after(1000,self._apply_windows_taskbar_icon)
+        try:self.bind('<Map>',lambda e:self.after_idle(self._apply_windows_taskbar_icon),add='+')
+        except Exception:pass
+        self._styles(); self._layout(); self.show('PROFILE')
+        self.protocol('WM_DELETE_WINDOW',self._on_close)
+        self.after(650,self._start_mx_sync)
+        if self.settings.get('auto_check_updates'): self.after(1300,self._silent_update_che
+
+--- needle: transaction @ 81618 ---
+('ready'):
+            tk.Button(actions,text='JOIN RACE SERVER',command=lambda:self._join_race_server(race['id'],rider['id']),bg=GREEN,fg='white',activebackground='#50df91',relief='flat',font=('Segoe UI Black',12),pady=12,cursor='hand2').pack(side='left',fill='x',expand=True,padx=(0,6))
+        else:
+            tk.Button(actions,text='LAUNCH MX BIKES',command=self._launch_mx_game,bg=ACCENT,fg='white',relief='flat',font=('Segoe UI Black',11),pady=12,cursor='hand2').pack(side='left',fill='x',expand=True,padx=(0,6))
+        tk.Button(actions,text='SYNC NOW',command=self._run_mx_sync,bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Black',9),padx=15,pady=12,cursor='hand2').pack(side='left',padx=(6,0))
+
+    def signup_demo(self,race):
+        rider=self.rider()
+        if self.conn.execute('SELECT 1 FROM registrations WHERE race_id=? AND rider_id=?',(race['id'],rider['id'])).fetchone(): messagebox.showinfo('Already Registered','You are already registered for this race.'); return
+        if not self.eligible(race,rider): messagebox.showerror('Race Locked','Your current skill/etiquette rating does not qualify for this lobby.'); return
+        quote=member_quote(self.conn,rider['id'],race); member_entry=quote['member_price'] if quote['eligible'] else float(race['entry_fee'])
+        bal=wallet_balance(self.conn,rider['id']); paid,purse=current_purse(self.conn,race['id']); fast=fastest_lap_pool(self.conn,race['id'])
+        dlg=tk.Toplevel(self); dlg.title('Enter Race'); dlg.geometry('560x470'); dlg.configure(bg=BG); dlg.transient(self); dlg.grab_set()
+        tk.Label(dlg,text='READY TO RACE?',fg=TEXT,bg=BG,font=('Segoe UI Black',20)).pack(anchor='w',padx=24,pady=(24,4))
+        tk.Label(dlg,text=race['name'],fg=ACCENT,bg=BG,font=('Segoe UI Black',12)).pack(anchor='w',padx=24)
+        summary=tk.Frame(dlg,bg=PANEL); summary.pack(fill='x',padx=24,pady=16)
+        for lab,val,col in [('WALLET',f'${bal:,.2f}',TEXT),('ENTRY',f"${member_entry:.2f}",GREEN if quote['eligible'] else GOLD),('CURRENT PURSE',f'${purse:,.2f}',GOLD),('FASTEST LAP',f'${fast:,.2f}',GREEN)]:
+            row=tk.Frame(summary,bg=PANEL); row.pack(fill='x',padx=14,pady=4); tk.Label(row,text=lab,fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',8)).pack(side='left'); tk.Label(row,text=val,fg=col,bg=PANEL,font=('Segoe UI Black',10)).pack(side='right')
+        if bal<race['entry_fee']:
+            tk.Button(dlg,text=f"ADD ${race['entry_fee']-bal:.2f} OR MORE TO WALLET",command=lambda:[dlg.destroy(),self.add_funds_dialog()],bg=PANEL2,fg=TEXT,relief='flat',font=('Segoe UI Black',9),pady=9).pack(fill='x',padx=24,pady=(0,10))
+        if quote['eligible']:
+            tk.Label(dlg,text=f"{quote['plan']['name'].upper()} MEMBER PRICE • SAVE ${quote['discount']:.2f} • {quote['remaining_today']} MEMBER-PRICED RACE(S) REMAIN TODAY AFTER THIS ENTRY. The wallet registers the normal race amount first, then returns your member savings instantly so purse funding stays exact.",fg=GREEN,bg=PANEL,justify='left',font=('Segoe UI Semibold',9),padx=12,pady=12,wraplength=480).pack(fill='x',padx=24,pady=(0,8))
+        tk.Label(dlg,text='ALL SALES ARE FINAL — NO REFUNDS. The final purse and fastest-lap bonus will be shown and locked before racing begins.',fg=GOLD,bg=PANEL,justify='left',font=('Segoe UI Semibold',9),padx=12,pady=12,wraplength=480).pack(fill='x',padx=24)
+        ack=tk.BooleanVar(False); tk.Checkbutton(dlg,text='I understand and accept the no-refund policy.',variable=ack,bg=BG,fg=TEXT,selectcolor=PANEL,activebackground=BG,activeforeground=TEXT,font=('Segoe UI',10)).pack(anchor='w',padx=24,pady=13)
+        def confirm():
+            try:
+                newbal=register_with_wallet(self.conn,rider['id'],race['id'],ack.get())
+                if quote['eligible'] and quote['discount']>0:
+                    wallet_credit(self.conn,rider['id'],quote['discount'],kind='SUBSCRIPTION_REBATE',provider='MEMBERSHIP',note=f"{quote['plan']['name']} Community race savings")
+                    record_member_use(self.conn,rider['id'],race['id'],quote)
+                    newbal=wallet_balance(self.conn,rider['id'])
+            except ValueError as exc:messagebox.showerror('Race Entry',str(exc),parent=dlg); return
+            except Exception as exc:messagebox.showerror('Membership','Race registered, but the membership rebate could not be completed: '+str(exc),parent=dlg); return
+            now=datetime.now().replace(microsecond=0).isoformat()
+            self.conn.execute('INSERT INTO payment_transactions(rider_id,race_id,provider,provider_ref,amount,status,created_at) VALUES(?,?,?,?,?,?,?)',(rider['id'],race['id'],'RACE_WALLET',None,race['entry_fee'],'PAID',now)); self.conn.commit()
+            dlg.destroy(); messagebox.showinfo('Gate Reserved',f"You are officially registered.\nWallet remaining: ${newbal:,.2f}"); self.open_race_details(race['id'])
+        confirm_text=f"CONFIRM MEMBER ENTRY • ${member_entry:.2f}" if quote['eligible'] else f"CONFIRM ENTRY • ${race['entry_fee']:.2f}"
+        tk.Button(dlg,text=confirm_text,command=confirm,bg=GREEN if quote['eligible'] else ACCENT,fg='white',relief='flat',font=('Segoe UI Black',11),pady=10,cursor='hand2').pack(fill='x',padx=24)
+
+    # ---------- OTHER RIDER PAGES ----------
+    def _live_active_session(self):
+        return self.conn.execute("""SELECT rs.*,rc.name race_name,rc.track,rc.discipline,rc.skill_class,rc.lobby_tier,
+                                  rc.fast_lap_contribution,rc.prize_contribution,rc.entry_fee
+                                  FROM race_sessions rs JOIN races rc ON rc.id=rs.race_id
+                                  WHERE rs.status IN ('RUNNING','PREPARED') ORDER BY CASE rs.status WHEN 'RUNNING' THEN 0 ELSE 1 END,rs.id DESC LIMIT 1""").fetchone()
+
+    @staticmethod
+    def _lap_display(ms):
+        try:ms=int(ms or 0)
+        except Exception:return '—'
+        if ms<=0:return '—'
+        m,rem=divmod(ms,60000); sec=rem/1000
+        return f'{m}:{sec:06.3f}' if m else f'{sec:.3f}'
+
+    def _live_rider_name(self,race_id,race_number):
+        row=self.conn.execute('SELECT name FROM live_riders WHERE race_id=? AND race_number=?',(race_id,int(race_number or 0))).fetchone()
+        return row['name'] if row and row['name'] else None
+
+    def _process_commentary_events(self,race_id):
+        rows=list(self.conn.execute('SELECT * FROM live_events WHERE race_id=? AND id>? ORDER BY id LIMIT 100',(race_id,self.commentary_last_event_id)))
+        for row in rows:
+            self.commentary_last_event_id=max(self.commentary_last_event_id,row['id'])
+            try:event=__import__('json').loads(row['event_json'])
+            except Exception:continue
+            cues=self.commentary_director.cues_from_event(event,lambda rn:self._live_rider_name(race_id,rn))
+            for cue in cues:
+                self.commentary_history.append(cue.text)
+                self.commentary_history=self.commentary_history[-12:]
+                try:self.announcer.speak(cue.text,cue.priority)
+                except Exception:pass
+
+    def _refresh_live_widgets(self,race_id):
+        if self.current_page!='LIVE' or not hasattr(self,'live_tower') or not self.live_tower.winfo_exists():return
+        self._process_commentary_events(race_id)
+        session=self.conn.execute('SELECT * FROM race_sessions WHERE race_id=?',(race_id,)).fetchone()
+        race=self.conn.execute('SELECT * FROM races WHERE id=?',(race_id,)).fetchone()
+        riders=list(self.conn.execute('SELECT * FROM live_riders WHERE race_id=? ORDER BY COALESCE(position,999),race_number',(race_id,)))[:12]
+        session_name=(session['session'] or 'WAITING').replace('QUALIFYPRACTICE','QUALIFY PRACTICE') if session else 'WAITING'
+        state=(session['session_state'] or 'WAITING') if session else 'WAITING'
+        top=f"{self.race_class_label(race)} • {session_name} • {state}" if race else f'{session_name} • {state}'
+        if not getattr(self,'_live_header_label',None) or not self._live_header_label.winfo_exists():
+            self._live_header_label=tk.Label(self.live_tower,text=top,fg=GOLD,bg='#11161c',font=('Segoe UI Black',8),wraplength=230,justify='left')
+            self._live_header_label.pack(fill='x',padx=10,pady=10)
+        else:self._live_header_label.configure(text=top)
+        if not hasattr(self,'_live_row_widgets'):self._live_row_widgets={}
+        desired=[]
+        if not riders:
+            if not getattr(self,'_live_waiting_label',None) or not self._live_waiting_label.winfo_exists():
+                self._live_waiting_label=tk.Label(self.live_tower,text='Waiting for riders to join the MX Bikes server…',fg=MUTED,bg='#11161c',font=('Segoe UI',9),wraplength=220,justify='left')
+                self._live_waiting_label.pack(anchor='w',padx=10,pady=8)
+        else:
+            if getattr(self,'_live_waiting_label',None) and self._live_waiting_label.winfo_exists():self._live_waiting_label.destroy()
+            self._live_waiting_label=None
+        for idx,r in enumerate(riders):
+          
+
+
+===== NAVIGATION =====
+--- needle: PROFILE SETTINGS @ 16145 ---
+  target_dir.mkdir(parents=True,exist_ok=True)
+        target=target_dir/f'{kind}.png'
+        if Image is None:
+            shutil.copy2(source,target)
+            return str(target)
+        from PIL import ImageOps
+        target_size=(640,640) if kind=='avatar' else (1800,520)
+        with Image.open(source) as im:
+            im=im.convert('RGB')
+            # Store normalized media so JPEG/WebP/GIF/huge phone photos all render the same way.
+            im=ImageOps.fit(im,target_size,method=Image.Resampling.LANCZOS)
+            im.save(target,'PNG',optimize=True)
+        return str(target)
+
+    def _profile_avatar(self,parent,rider,size=108):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        wrap=tk.Frame(parent,bg=PANEL,width=size,height=size,highlightbackground=accent,highlightthickness=3)
+        wrap.pack_propagate(False)
+        photo=self._load_profile_photo((rider['avatar_path'] or '').strip(),(size,size))
+        if photo:
+            tk.Label(wrap,image=photo,bg=PANEL).pack(fill='both',expand=True)
+            return wrap
+        canvas=tk.Canvas(wrap,width=size,height=size,bg=PANEL,highlightthickness=0); canvas.pack(fill='both',expand=True)
+        canvas.create_oval(8,8,size-8,size-8,fill=PANEL2,outline=accent,width=3)
+        initials=''.join(x[0] for x in rider['username'].split()[:2]).upper() or '?'
+        canvas.create_text(size/2,size/2,text=initials,fill=TEXT,font=('Segoe UI Black',28))
+        return wrap
+
+    def _profile_header(self,rider):
+        accent=(rider['profile_accent'] or ACCENT) if 'profile_accent' in rider.keys() else ACCENT
+        header=self.card(self.content); header.pack(fill='x',padx=28,pady=(24,10))
+        banner=tk.Frame(header,bg='#0e1115',height=190); banner.pack(fill='x'); banner.pack_propagate(False)
+        banner_photo=self._load_profile_photo((rider['banner_path'] or '').strip(),(1180,190)) if 'banner_path' in rider.keys() else None
+        if banner_photo:
+            tk.Label(banner,image=banner_photo,bg='#0e1115').pack(fill='both',expand=True)
+        else:
+            can=tk.Canvas(banner,bg='#0e1115',highlightthickness=0); can.pack(fill='both',expand=True)
+            can.create_rectangle(0,0,1800,190,fill='#11161c',outline='')
+            for x in range(-200,1900,130): can.create_polygon(x,190,x+260,0,x+330,0,x+70,190,fill='#171d24',outline='')
+            can.create_text(28,32,text='MXB RACE DAY LIVE',anchor='nw',fill='#3b4652',font=('Segoe UI Black',25,'italic'))
+        identity=tk.Frame(header,bg=PANEL); identity.pack(fill='x',padx=18,pady=14)
+        avatar=self._profile_avatar(identity,rider,108); avatar.pack(side='left',padx=(0,18))
+        info=tk.Frame(identity,bg=PANEL); info.pack(side='left',fill='x',expand=True)
+        name_row=tk.Frame(info,bg=PANEL); name_row.pack(fill='x')
+        tk.Label(name_row,text=rider['username'],fg=TEXT,bg=PANEL,font=('Segoe UI Black',28)).pack(side='left')
+        tk.Label(name_row,text=f"  ◆ #{self.overall_rank(rider)}",fg=GOLD,bg=PANEL,font=('Segoe UI Black',11)).pack(side='left',pady=(9,0))
+        meta=[f"#{rider['number']}" if rider['number'] else '',rider['team'] or '',rider['bike_model'] or '',rider['region'] or '']
+        tk.Label(info,text='  •  '.join(x for x in meta if x),fg=MUTED,bg=PANEL,font=('Segoe UI Semibold',10)).pack(anchor='w',pady=(2,9))
+        badges=tk.Frame(info,bg=PANEL); badges.pack(anchor='w')
+        for title,value,color in (
+            ('SKILL STATUS',f"{rider['skill_class'].upper()}  •  {rider['skill_rating']} MMR",GOLD),
+            ('ETIQUETTE',f"{rider['racecraft_grade']}  •  {self.etiquette_text(rider)}  •  {rider['racecraft_score']}",GREEN if rider['racecraft_score']>=800 else GOLD),
+        ):
+            box=tk.Frame(badges,bg=PANEL2,highlightbackground=LINE,highlightthickness=1); box.pack(side='left',padx=(0,8))
+            tk.Label(box,text=title,fg=MUTED,bg=PANEL2,font=('Segoe UI Semibold',7)).pack(anchor='w',padx=10,pady=(6,0))
+            tk.Label(box,text=value,fg=color,bg=PANEL2,font=('Segoe UI Black',10)).pack(anchor='w',padx=10,pady=(0,6))
+        return header
+
+    def _set_profile_section(self,section):
+        self.profile_section=section
+        self.show('PROFILE',force=True)
+
+    def _profile_subnav(self):
+        row=tk.Frame(self.content,bg=BG); row.pack(fill='x',padx=28,pady=(0,12))
+        for label,key in [('OVERVIEW','OVERVIEW'),('MY RACES','RACES'),('WALLET','WALLET'),('MEMBERSHIP','MEMBERSHIP'),('PROFILE SETTINGS','SETTINGS')]:
+            active=self.profile_section==key
+            tk.Button(row,text=label,command=lambda k=key:self._set_profile_section(k),bg=ACCENT if active else PANEL2,fg='white' if active else TEXT,activebackground=ACCENT,activeforeground='white',relief='flat',font=('Segoe UI Black' if active else 'Segoe UI Semibold',9),padx=16,pady=8,cursor='hand2').pack(side='left',padx=(0,6))
+
+    def _bind_click_recursive(self, widget, callback):
+        try:
+            widget.configure(cursor='hand2')
+        except Exception:
+            pass
+        widget.bind('<Button-1>',lambda e:callback())
+        for child in widget.winfo_children():
+            self._bind_click_recursive(child,callback)
+
+    def _scrollable(self, parent, padx=28, pady=(0,24)):
+        outer=tk.Frame(parent,bg=BG); outer.pack(fill='both',expand=True,padx=padx,pady=pady)
+        canvas=tk.Canvas(outer,bg=BG,highlightthickness=0)
+        bar=ttk.Scrollbar(outer,orient='vertical',command=canvas.yview)
+        canvas.configure(yscrollcommand=bar.set); bar.pack(side='right',fill='y'); canvas.pack(side='left',fill='both',expand=True)
+        inner=tk.Frame(canvas,bg=BG); win=canvas.create_window((0,0),window=inner,anchor='nw')
+        inner.bind('<Configure>',lambda e:canvas.configure(scrollregion=canvas.bbox('all')))
+        canvas.bind('<Configure>',lambda e:canvas.itemconfigure(win,width=e.width))
+        canvas.bind_all('<MouseWheel>',lambda e:canvas.yview_scroll(int(-1*(e.delta/120)),'units'))
+        return inner
+
+    def _load_track_tk(self,path,size=(330,186)):
+        if not path or Image is None or ImageTk is None:return None
+        try:
+            source=Path(path)
+            if not source.exists():return None
+            stat=source.stat(); key=(str(source.resolve()).lower(),tuple(size),int(stat.st_mtime_ns),int(stat.st_size))
+            cached=self._photo_cache.get(key)
+            if cached is not None:return cached
+            with Image.open(source) as im:
+                im=im.convert('RGB'); im.thumbnail(size,Image.Resampling.LANCZOS)
+                canvas=Image.new('RGB',size,(21,25,30)); x=(size[0]-im.width)//2; y=(size[1]-im.height)//2; canvas.paste(im,(x,y))
+                photo=ImageTk.PhotoImage(canvas)
+            self._photo_cache[key]=photo
+            while len(self._photo_cache)>96:self._photo_cache.pop(next(iter(self._photo_cache)))
+            return photo
+        except Exception:return None
+
+    def _track_photo(self,parent,discipline,track,size=(330,186),on_click=None,on_resolved=None):
+        wrap=tk.Frame(parent,bg='#0f1216',width=size[0],height=size[1],highlightbackground=LINE,highlightthickness=1)
+        wrap.pack_propagate(False)
+        label=tk.Label(wrap,text='MXB-SHOP TRACK PHOTO\nLOADING…',fg=MUTED,bg='#0f1216',font=('Segoe UI Semibold',9),justify='center')
+        label.pack(fill='both',expand=True)
+        if on_click:
+            label.configure(cursor='hand2'); label.bind('<Button-1>',lambda e:on_click())
+        media_key=(str(discipline).upper(),str(track))
+        def apply(media):
+            self._track_media_mem[media_key]=media
+            try:
+                if not label.winfo_exists(): return
+            except Exception:
+                return
+            photo=self._load_track_tk(media.local_path,size)
+            if photo:
+                label.configure(image=photo,text='')
+            elif media.status in ('ERROR','NOT_FOUND'):
+                label.configure(text='MXB-SHOP TRACK PHOTO\nSOURCE RETRY AVAILABLE',fg=GOLD)
+            if on_resolved:
+                try:on_resolved(media)
+                except Exception:pass
+        cached=self._track_media_mem.get(media_key)
+        if cached is None:
+            cached=self.track_media.get_cached(discipline,track); self._track_media_mem[media_key]=cached
+        if cached.status=='READY' and cached.local_path and Path(cached.local_path).exists():
+            apply(cached)
+        else:
+            self.track_media.resolve_async(discipline,track,callback=lambda m:self.after(0,lambda:apply(m)))
+        return wrap
+
+    def _start_mx_sync(self):
+        if self._mx_sync_started:
+            return
+        self._mx_sync_started=True
+        self._run_mx_sync()
+
+    def _run_mx_sync(self):
+        if not self.winfo_exists(): return
+        try:
+            self.mx_status_label.configure(text='● SYNCING MX BIKES…',fg=GOLD)
+        except Exception:
+            pass
+        def done(env):
+            try:self.after(0,l
+
+--- needle: WALLET @ 336 ---
+import os, shutil, threading, tkinter as tk, webbrowser, re
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
+from datetime import datetime
+from .config import VERSION, APP_NAME, APPDATA, load_settings
+from .database import (
+    connect, seed, current_purse, payout_split, fastest_lap_pool,
+    race_financials, wallet_balance, wallet_credit, wallet_debit, wallet_statement,
+    register_with_wallet, setting_float
+)
+from .updater import check_for_update, download_update, launch_update
+from .mx_agent import MXRaceAgent
+from .game_bridge import MXGameBridge, GameBridgeError, ensure_game_bridge_schema
+from .bike_garage import MXBikeGarage, BikeGarageError
+from .windows_taskbar import apply_taskbar_identity, release_taskbar_icons
+from .in_app_garage import InAppGarageRenderer, GarageModelError
+from .track_media import TrackMediaResolver
+from .pricing import apply_low_entry_pricing
+from .subscriptions import (PLANS, ensure_subscription_schema, get_subscription, usage_today, member_quote,
+                            record_member_use, activate_demo_subscription, cancel_auto_renew,
+                            admin_membership_metrics)
+from .commentary import CommentaryDirector
+from .broadcast import WindowsVoiceAnnouncer, VoiceSettings
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = ImageTk = None
+
+BG='#0b0d10'; PANEL='#15191e'; PANEL2='#1d232a'; TEXT='#f3f5f7'; MUTED='#98a2ad'
+ACCENT='#0b84ff'; GOLD='#ffc247'; GREEN='#45d483'; RED='#ff5757'; LINE='#24303c'; BLUE='#20a8ff'
+
+
+APP_USER_MODEL_ID='MXBRaceDayLive.Desktop.v3'
+try:
+    if os.name=='nt':
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+except Exception:
+    pass
+
+NAV = [
+    ('MY PROFILE','PROFILE'),
+    ('GARAGE','GARAGE'),
+    ('FIND A RACE','UPCOMING'),
+    ('LIVE','LIVE'),
+    ('RESULTS','RESULTS'),
+    ('SERIES','CHAMPIONSHIPS'),
+    ('RANKINGS','RANKINGS'),
+    ('ADMIN','ADMIN'),
+]
+
+class RaceDayLiveApp(tk.Tk):
+    def __init__(self):
+        super().__init__(); seed(); self.conn=connect(); apply_low_entry_pricing(self.conn); ensure_subscription_schema(self.conn); self.settings=load_settings(); self.current_rider='Welchy'
+        self.mx_agent=MXRaceAgent(connect,self.current_rider); ensure_game_bridge_schema(self.conn); self.game_bridge=MXGameBridge(self.conn); self.bike_garage=MXBikeGarage(self.conn,self.game_bridge,self.current_rider); self.garage_renderer=InAppGarageRenderer(self.bike_garage); self.track_media=TrackMediaResolver(connect)
+        self.commentary_director=CommentaryDirector(); self.commentary_history=[]; self.commentary_last_event_id=0
+        def _setting(key,default=''):
+            row=self.conn.execute('SELECT value FROM admin_settings WHERE key=?',(key,)).fetchone(); return (row['value'] if row else default)
+        voice_enabled=str(_setting('announcer_spoken_enabled','true')).lower()=='true'
+        try:voice_rate=int(_setting('announcer_voice_rate','2'))
+        except Exception:voice_rate=2
+        self.announcer=WindowsVoiceAnnouncer(VoiceSettings(enabled=voice_enabled,rate=voice_rate,voice_name=_setting('announcer_voice_name','')))
+        self._image_refs=[]; self._photo_cache={}; self._profile_photo_cache={}; self._track_media_mem={}; self._mx_sync_started=False; self.profile_section='OVERVIEW'; self.race_filter='ALL'; self.current_page='PROFILE'
+        self.title(f'{APP_NAME}  v{VERSION}'); self.geometry('1480x900'); self.minsize(1180,760); self.configure(bg=BG)
+        self._taskbar_icon_path=os.path.join(os.path.dirname(os.path.dirname(__file__)),'assets','mxb_race_day_live.ico')
+        self._taskbar_icon=None
+        try:
+            if os.path.isfile(self._taskbar_icon_path):
+                self.iconbitmap(default=self._taskbar_icon_path)
+                if Image is not None and ImageTk is not None:
+                    with Image.open(self._taskbar_icon_path) as icon_im:
+                        icon_im=icon_im.convert('RGBA'); icon_im.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        self._taskbar_icon=ImageTk.PhotoImage(icon_im.copy())
+                    self.iconphoto(True,self._taskbar_icon)
+        except Exception:pass
+        try:self.update_idletasks()
+        except Exception:pass
+        self.after_idle(self._apply_windows_taskbar_icon)
+        self.after(250,self._apply_windows_taskbar_icon)
+        self.after(1000,self._apply_windows_taskbar_icon)
+        try:self.bind('<Map>',lambda e:self.after_idle(self._apply_windows_taskbar_icon),add='+')
+        except Exception:pass
+        self._styles(); self._layout(); self.show('PROFILE')
+        self.protocol('WM_DELETE_WINDOW',self._on_close)
+        self.after(650,self._start_mx_sync)
+        if self.settings.get('auto_check_updates'): self.after(1300,self._silent_upd
+
+--- needle: FIND A RACE @ 1817 ---
+import os, shutil, threading, tkinter as tk, webbrowser, re
+from pathlib import Path
+from tkinter import ttk, messagebox, filedialog
+from datetime import datetime
+from .config import VERSION, APP_NAME, APPDATA, load_settings
+from .database import (
+    connect, seed, current_purse, payout_split, fastest_lap_pool,
+    race_financials, wallet_balance, wallet_credit, wallet_debit, wallet_statement,
+    register_with_wallet, setting_float
+)
+from .updater import check_for_update, download_update, launch_update
+from .mx_agent import MXRaceAgent
+from .game_bridge import MXGameBridge, GameBridgeError, ensure_game_bridge_schema
+from .bike_garage import MXBikeGarage, BikeGarageError
+from .windows_taskbar import apply_taskbar_identity, release_taskbar_icons
+from .in_app_garage import InAppGarageRenderer, GarageModelError
+from .track_media import TrackMediaResolver
+from .pricing import apply_low_entry_pricing
+from .subscriptions import (PLANS, ensure_subscription_schema, get_subscription, usage_today, member_quote,
+                            record_member_use, activate_demo_subscription, cancel_auto_renew,
+                            admin_membership_metrics)
+from .commentary import CommentaryDirector
+from .broadcast import WindowsVoiceAnnouncer, VoiceSettings
+try:
+    from PIL import Image, ImageTk
+except Exception:
+    Image = ImageTk = None
+
+BG='#0b0d10'; PANEL='#15191e'; PANEL2='#1d232a'; TEXT='#f3f5f7'; MUTED='#98a2ad'
+ACCENT='#0b84ff'; GOLD='#ffc247'; GREEN='#45d483'; RED='#ff5757'; LINE='#24303c'; BLUE='#20a8ff'
+
+
+APP_USER_MODEL_ID='MXBRaceDayLive.Desktop.v3'
+try:
+    if os.name=='nt':
+        import ctypes
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(APP_USER_MODEL_ID)
+except Exception:
+    pass
+
+NAV = [
+    ('MY PROFILE','PROFILE'),
+    ('GARAGE','GARAGE'),
+    ('FIND A RACE','UPCOMING'),
+    ('LIVE','LIVE'),
+    ('RESULTS','RESULTS'),
+    ('SERIES','CHAMPIONSHIPS'),
+    ('RANKINGS','RANKINGS'),
+    ('ADMIN','ADMIN'),
+]
+
+class RaceDayLiveApp(tk.Tk):
+    def __init__(self):
+        super().__init__(); seed(); self.conn=connect(); apply_low_entry_pricing(self.conn); ensure_subscription_schema(self.conn); self.settings=load_settings(); self.current_rider='Welchy'
+        self.mx_agent=MXRaceAgent(connect,self.current_rider); ensure_game_bridge_schema(self.conn); self.game_bridge=MXGameBridge(self.conn); self.bike_garage=MXBikeGarage(self.conn,self.game_bridge,self.current_rider); self.garage_renderer=InAppGarageRenderer(self.bike_garage); self.track_media=TrackMediaResolver(connect)
+        self.commentary_director=CommentaryDirector(); self.commentary_history=[]; self.commentary_last_event_id=0
+        def _setting(key,default=''):
+            row=self.conn.execute('SELECT value FROM admin_settings WHERE key=?',(key,)).fetchone(); return (row['value'] if row else default)
+        voice_enabled=str(_setting('announcer_spoken_enabled','true')).lower()=='true'
+        try:voice_rate=int(_setting('announcer_voice_rate','2'))
+        except Exception:voice_rate=2
+        self.announcer=WindowsVoiceAnnouncer(VoiceSettings(enabled=voice_enabled,rate=voice_rate,voice_name=_setting('announcer_voice_name','')))
+        self._image_refs=[]; self._photo_cache={}; self._profile_photo_cache={}; self._track_media_mem={}; self._mx_sync_started=False; self.profile_section='OVERVIEW'; self.race_filter='ALL'; self.current_page='PROFILE'
+        self.title(f'{APP_NAME}  v{VERSION}'); self.geometry('1480x900'); self.minsize(1180,760); self.configure(bg=BG)
+        self._taskbar_icon_path=os.path.join(os.path.dirname(os.path.dirname(__file__)),'assets','mxb_race_day_live.ico')
+        self._taskbar_icon=None
+        try:
+            if os.path.isfile(self._taskbar_icon_path):
+                self.iconbitmap(default=self._taskbar_icon_path)
+                if Image is not None and ImageTk is not None:
+                    with Image.open(self._taskbar_icon_path) as icon_im:
+                        icon_im=icon_im.convert('RGBA'); icon_im.thumbnail((256,256),Image.Resampling.LANCZOS)
+                        self._taskbar_icon=ImageTk.PhotoImage(icon_im.copy())
+                    self.iconphoto(True,self._taskbar_icon)
+        except Exception:pass
+        try:self.update_idletasks()
+        except Exception:pass
+        self.after_idle(self._apply_windows_taskbar_icon)
+        self.after(250,self._apply_windows_taskbar_icon)
+        self.after(1000,self._apply_windows_taskbar_icon)
+        try:self.bind('<Map>',lambda e:self.after_idle(self._apply_windows_taskbar_icon),add='+')
+        except Exception:pass
+        self._styles(); self._layout(); self.show('PROFILE')
+        self.protocol('WM_DELETE_WINDOW',self._on_close)
+        self.after(650,self._start_mx_sync)
+        if self.settings.get('auto_check_updates'): self.after(1300,self._silent_update_check)
+
+    def _styles(self):
+        s=ttk.Style(self); s.theme_use('clam')
+        s.configure('Treeview',background=PANEL,fieldbackground=PANEL,foreground=TEXT,rowheight=34,bordercolor=LINE,font=('Segoe UI',10))
+        s.configure('Treeview.Heading',background=PANEL2,foreground=TEXT,font=('Segoe UI Semibold',10),relief='flat')
+        s.map('Treeview',background=[('selected','#2d3944')])
+        s.configure('TNotebook',background=BG,borderwidth=0); s.configure('TNotebook.Tab',padding=(14,8))
+
+    def _layout(self):
+        header=tk.Frame(self,bg=BG,height=74); header.pack(fill='x'); header.pack_propagate(False)
+        brand=tk.Frame(header,bg=BG); brand.pack(side='left',padx=24)
+        tk.Label(brand,text='MXB',fg=TEXT,bg=BG,font=('Segoe UI Black',26,'italic')).pack(side='left')
+        tk.Label(brand,text=' RACE DAY',fg=TEXT,bg=BG,font=('Segoe UI Black',22)).pack(side='left')
+        tk.Label(brand,text=' LIVE',fg=ACCENT,bg=BG,font=('Segoe UI Black',22,'italic')).pack(side='left')
+        self.update_btn=tk.Button(header,text='UPDATE',command=self.do_update,bg=ACCENT,fg='white',activebackground='#ff7a30',relief='flat',font=('Segoe UI Semibold',10),padx=18,pady=8,cursor='hand2'); self.update_btn.pack(side='right',padx=24,pady=18)
+        tk.Label(header,text=f'v{VERSION}',fg=MUTED,bg=BG,font=('Segoe UI',9)).pack(side='right')
+        tk.Frame(self,bg=ACCENT,height=3).pack(fill='x')
+        body=tk.Frame(self,bg=BG); body.pack(fill='both',expand=
