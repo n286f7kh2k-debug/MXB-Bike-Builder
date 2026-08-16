@@ -33,6 +33,9 @@ internal static class BikeModelViewer
         CancellationToken cancellationToken = default)
     {
         var bundle = await Task.Run(() => ResolveBundle(bike), cancellationToken);
+        if (FrostBikePreviewProvider.RequiresFrost(bundle.EdfFiles))
+            return await FrostBikePreviewProvider.CreateAsync(bike, bundle.SourcePath, cancellationToken);
+
         var decoder = await EnsureDecoderAsync(cancellationToken);
         var decoded = await DecodeAsync(decoder, bundle, cancellationToken);
         var viewport = BuildViewport(decoded);
