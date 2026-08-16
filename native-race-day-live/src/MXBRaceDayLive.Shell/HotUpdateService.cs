@@ -167,7 +167,7 @@ public sealed class HotUpdateService : IUpdateService, IDisposable
 
     private static string CacheBust(string url, string token)
     {
-        var separator = url.Contains('?', StringComparison.Ordinal) ? '&' : '?';
+        var separator = url.Contains("?", StringComparison.Ordinal) ? '&' : '?';
         return $"{url}{separator}rdl={Uri.EscapeDataString(token)}";
     }
 
