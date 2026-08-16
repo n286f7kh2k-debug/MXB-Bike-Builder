@@ -1,7 +1,7 @@
 {
   "version": "0.5.0",
   "filename": "MXB_Race_Day_Live_v0_5_0_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.0 current package inspection pass.",
-  "builder_script": "race-control/inspect_v050_ui.py",
-  "rebuild_attempt": "ui-inspection"
+  "notes": "MXB Race Day Live v0.5.0 targeted UI method inspection pass.",
+  "builder_script": "race-control/inspect_v050_methods.py",
+  "rebuild_attempt": "method-inspection"
 }
