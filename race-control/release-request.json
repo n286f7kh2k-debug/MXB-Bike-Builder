@@ -1,7 +1,7 @@
 {
   "version": "0.3.8",
   "filename": "MXB_Race_Day_Live_v0_3_8_UPDATE.zip",
-  "notes": "Icon source inspection only; do not publish until the real Race Day Live desktop logo is recovered and validated.",
-  "builder_script": "race-control/inspect_icon_sources.py",
-  "inspection": 1
+  "notes": "MXB Race Day Live v0.3.8: fixes the Windows taskbar icon by taking the exact icon Windows already displays for the MXB Race Day Live desktop shortcut and applying it directly to the live app HWND. A fresh AppUserModelID bypasses stale Python/Tk shell caching; WM_SETICON sets both large and small taskbar icons, top-level class icons are updated, and the icon is re-applied after window mapping. Existing Garage, performance optimizations, updater/restart, one-click joining, memberships, wallet, race economics, verified track artwork, results and admin controls are preserved.",
+  "builder_script": "race-control/build_v038_taskbar_icon.py",
+  "rebuild_attempt": 2
 }
