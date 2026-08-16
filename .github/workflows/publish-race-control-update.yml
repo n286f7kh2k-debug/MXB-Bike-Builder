@@ -31,10 +31,8 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           $source = 'race-control/launcher/MXBRaceDayLiveLauncher.cs'
-          $icon = 'race-control/staging/rdl-launcher.ico'
           $out = 'race-control/staging/MXB Race Day Live.exe'
           if (-not (Test-Path $source)) { throw 'launcher source missing' }
-          if (-not (Test-Path $icon)) { throw 'launcher icon missing' }
           $candidates = @(
             "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe",
             "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
@@ -42,7 +40,7 @@ jobs:
           $csc = $candidates | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $csc) { throw 'C# compiler not found on Windows runner' }
           Write-Host "Compiler: $csc"
-          & $csc /nologo /target:winexe /optimize+ /platform:anycpu "/win32icon:$icon" "/out:$out" $source
+          & $csc /nologo /target:winexe /optimize+ /platform:anycpu "/out:$out" $source
           if ($LASTEXITCODE -ne 0) { throw "csc failed with exit code $LASTEXITCODE" }
           if (-not (Test-Path $out)) { throw 'branded launcher output missing' }
 
@@ -83,6 +81,7 @@ jobs:
           path: |
             race-control/staging/mxb_asset_decoder.exe
             race-control/staging/MXB Race Day Live.exe
+            race-control/staging/rdl-launcher.ico
           if-no-files-found: error
 
   publish:
