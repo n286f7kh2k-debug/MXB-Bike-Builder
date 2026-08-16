@@ -145,15 +145,6 @@ jobs:
               Path(path).unlink(missing_ok=True)
           PY
 
-      - name: Upload assembled v0.5.11 release
-        uses: actions/upload-artifact@v4
-        with:
-          name: mxb-v0511-release
-          path: |
-            race-control/releases/MXB_Race_Day_Live_v0_5_11_UPDATE.zip
-            race-control/latest.json
-          if-no-files-found: error
-
       - name: Publish release through GitHub API
         shell: bash
         env:
@@ -171,12 +162,15 @@ jobs:
           repo = os.environ['GITHUB_REPOSITORY']
           token = os.environ['GH_TOKEN']
           api = f'https://api.github.com/repos/{repo}'
-          release_path = 'race-control/releases/MXB_Race_Day_Live_v0_5_11_UPDATE.zip'
+          request = json.loads(Path('race-control/release-request.json').read_text(encoding='utf-8'))
+          version = str(request['version']).strip()
+          filename = str(request.get('filename') or f"MXB_Race_Control_v{version.replace('.', '_')}_UPDATE.zip")
+          release_path = f'race-control/releases/{filename}'
           manifest_path = 'race-control/latest.json'
           release = Path(release_path)
           manifest = Path(manifest_path)
           if not release.is_file() or not manifest.is_file():
-              raise SystemExit('assembled release files are missing')
+              raise SystemExit(f'assembled release files are missing for v{version}: {release_path}')
 
           headers = {
               'Authorization': f'Bearer {token}',
@@ -217,12 +211,12 @@ jobs:
                   base_tree = call('GET', f'/git/commits/{head}')['tree']['sha']
                   tree = call('POST', '/git/trees', {'base_tree': base_tree, 'tree': entries})['sha']
                   commit = call('POST', '/git/commits', {
-                      'message': 'Publish MXB Race Control v0.5.11',
+                      'message': f'Publish MXB Race Control v{version}',
                       'tree': tree,
                       'parents': [head],
                   })['sha']
                   call('PATCH', '/git/refs/heads/main', {'sha': commit, 'force': False})
-                  print(f'Published v0.5.11 at commit {commit}')
+                  print(f'Published v{version} at commit {commit}')
                   break
               except Exception as exc:
                   last_error = exc
