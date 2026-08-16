@@ -1,6 +1,6 @@
 {
-  "version": "0.4.7",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/releases/MXB_Bike_Builder_v0_4_7_UPDATE.zip",
-  "sha256": "15f4244345b76c45abe28324befb6a0716ec41c93a707559665657ca971cd980",
-  "notes": "Adds creator-locked OEM compatibility mode for 3D preview. Locked creator packages remain untouched; when Project OEM has a separate installed visual model under OEM_Models/MX, MXB Bike Builder uses that readable model instead. Build/install steps that need donor files still require an unlocked or authorized donor source."
+  "version": "0.5.0",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_5_0_UPDATE.zip",
+  "sha256": "ae046382961b260bee4a8db7ea7f14a9c8703a14fbc0838d26de38749e632ea8",
+  "notes": "Legacy MXB Bike Builder update channel migrated to MXB Race Day Live v0.5.0. This release unifies updater discovery on the Race Day Live channel, bypasses stale manifest caching, verifies the update package before install, preserves rider/settings data, and restarts through the hidden Windows launcher."
 }
