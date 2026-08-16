@@ -1,0 +1,139 @@
+name: Build Paint Creator v5
+
+on:
+  push:
+    branches:
+      - build/race-day-live-paint-creator
+    paths:
+      - 'ci-paint-v5/**'
+      - '.github/workflows/build-paint-creator-v5.yml'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout build branch
+        uses: actions/checkout@v4
+
+      - name: Rebuild verified v4 base and apply v5 patch
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          function Raw([string]$p) { return ((Get-Content -Raw $p) -replace '\s','') }
+          $p01 = (Raw 'ci-paint-v4-repair/p01_0.txt') + (Raw 'ci-paint-v4-repair/p01_1.txt') + (Raw 'ci-paint-v4-repair/p01_2.txt')
+          $p06 = (Raw 'ci-paint-v4-repair/p06_0.txt') + (Raw 'ci-paint-v4-repair/p06_1.txt') + (Raw 'ci-paint-v4-repair/p06_2.txt')
+          $p09 = (Raw 'ci-paint-v4-repair/p09s_0.txt') + (Raw 'ci-paint-v4-repair/p09s_1.txt') + (Raw 'ci-paint-v4-repair/p09s_2.txt') + (Raw 'ci-paint-v4-repair/p09s_3.txt') + (Raw 'ci-paint-v4-repair/p09s_4.txt')
+          $p10 = (Raw 'ci-paint-v4-repair/p10s_0.txt') + (Raw 'ci-paint-v4-repair/p10s_1.txt') + (Raw 'ci-paint-v4-repair/p10s_2.txt') + (Raw 'ci-paint-v4-repair/p10s_3.txt') + (Raw 'ci-paint-v4-repair/p10s_4.txt')
+          $b64 = $p01
+          foreach ($n in 2..5) { $b64 += Raw ("ci-paint-v4/part{0:D2}.txt" -f $n) }
+          $b64 += $p06
+          foreach ($n in 7..8) { $b64 += Raw ("ci-paint-v4/part{0:D2}.txt" -f $n) }
+          $b64 += $p09 + $p10
+          $baseZip = Join-Path $env:RUNNER_TEMP 'paint-v4-source.zip'
+          [IO.File]::WriteAllBytes($baseZip, [Convert]::FromBase64String($b64))
+          $hash = (Get-FileHash $baseZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($hash -ne '4d4a4e2c81b4210530d1993da89a859ea02f3c4eb870748de3ef85dabd1bd7c9') { throw "V4 BASE HASH MISMATCH: $hash" }
+          $src = Join-Path $env:RUNNER_TEMP 'paint-v5-source'
+          Expand-Archive -Path $baseZip -DestinationPath $src -Force
+
+          $patchZip = Join-Path $env:RUNNER_TEMP 'paint-v5-patch.zip'
+          $patchB64 = Raw 'ci-paint-v5/paint-v5-patch.zip.b64'
+          [IO.File]::WriteAllBytes($patchZip, [Convert]::FromBase64String($patchB64))
+          $patchHash = (Get-FileHash $patchZip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($patchHash -ne '3147dc1188d40d0b722f8051fdd6237667bc6971d4c91bb93addcd6b1388a5db') { throw "V5 PATCH HASH MISMATCH: $patchHash" }
+          Expand-Archive -Path $patchZip -DestinationPath $src -Force
+
+          # Explicit IO imports required by the WPF temporary compile project.
+          $ioFiles = @(
+            'src\MXBRaceDayLive.PaintCreator\Services\RiderGearSetStore.cs',
+            'src\MXBRaceDayLive.PaintCreator\Monetization\ProjectFingerprintService.cs',
+            'src\MXBRaceDayLive.PaintCreator\Services\ObjUvMeshLoader.cs',
+            'src\MXBRaceDayLive.PaintCreator\Services\IGearPreviewModelService.cs',
+            'src\MXBRaceDayLive.PaintCreator\Services\OfficialMxBikesPreviewModelService.cs'
+          )
+          foreach ($rel in $ioFiles) {
+            $file = Join-Path $src $rel
+            $text = Get-Content -Raw -LiteralPath $file
+            if ($text -notmatch '(?m)^using System\.IO;') {
+              Set-Content -LiteralPath $file -Value ("using System.IO;`r`n" + $text) -Encoding utf8
+            }
+          }
+          "SRC=$src" >> $env:GITHUB_ENV
+
+      - name: Build module
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $proj = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
+          dotnet build $proj -c Release
+
+      - name: Smoke test official MX Bikes FBX to WPF UV mesh
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $smoke = Join-Path $env:RUNNER_TEMP 'ModelSmoke'
+          New-Item -ItemType Directory -Force -Path $smoke | Out-Null
+          $lib = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
+          @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup>
+              <OutputType>Exe</OutputType>
+              <TargetFramework>net8.0-windows</TargetFramework>
+              <UseWPF>true</UseWPF>
+              <ImplicitUsings>enable</ImplicitUsings>
+              <Nullable>enable</Nullable>
+            </PropertyGroup>
+            <ItemGroup><ProjectReference Include="$lib" /></ItemGroup>
+          </Project>
+          "@ | Set-Content -LiteralPath (Join-Path $smoke 'ModelSmoke.csproj')
+          @'
+          using MXBRaceDayLive.PaintCreator.Models;
+          using MXBRaceDayLive.PaintCreator.Services;
+
+          var root = Path.Combine(Path.GetTempPath(), "MXBRaceDayLive-v5-smoke", Guid.NewGuid().ToString("N"));
+          Directory.CreateDirectory(root);
+          var context = new PaintCreatorContext { ProjectRoot = root };
+          var service = new OfficialMxBikesPreviewModelService();
+          var result = await service.ResolveAsync(PaintTargetType.Rider, context);
+          Console.WriteLine($"RESULT ready={result.Ready} status={result.Status} path={result.ObjPath}");
+          if (!result.Ready || string.IsNullOrWhiteSpace(result.ObjPath)) throw new Exception("Official rider preview was not resolved.");
+          var mesh = ObjUvMeshLoader.Load(result.ObjPath);
+          Console.WriteLine($"MESH positions={mesh.Positions.Count} triangles={mesh.TriangleIndices.Count/3} uvs={mesh.TextureCoordinates.Count}");
+          if (mesh.Positions.Count < 100 || mesh.TriangleIndices.Count < 300 || mesh.TextureCoordinates.Count != mesh.Positions.Count)
+              throw new Exception("Converted rider mesh/UV data is not usable.");
+          '@ | Set-Content -LiteralPath (Join-Path $smoke 'Program.cs')
+          dotnet run --project (Join-Path $smoke 'ModelSmoke.csproj') -c Release *>&1 | Tee-Object -FilePath (Join-Path $env:RUNNER_TEMP 'model-smoke.log')
+
+      - name: Publish self-contained Windows app
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $proj = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo\MXBRaceDayLive.PaintCreator.Demo.csproj'
+          $out = Join-Path $env:RUNNER_TEMP 'paint-v5-publish'
+          dotnet publish $proj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.29 -p:TargetLatestRuntimePatch=false -p:PublishSingleFile=false -o $out
+          "OUT=$out" >> $env:GITHUB_ENV
+
+      - name: Validate published binaries
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $allExe = @(Get-ChildItem -LiteralPath $env:OUT -Filter '*.exe')
+          if ($allExe.Count -lt 1) { throw 'No Windows EXE found.' }
+          $core = Join-Path $env:OUT 'MXBRaceDayLive.PaintCreator.dll'
+          if (!(Test-Path $core)) { throw 'Paint Creator module DLL missing.' }
+          $assimp = @(Get-ChildItem -LiteralPath $env:OUT -Recurse | Where-Object { $_.Name -match 'Assimp|SharpAssimp' })
+          if ($assimp.Count -lt 1) { throw 'FBX importer runtime files missing.' }
+          $exe = $allExe | Where-Object { $_.Name -like '*Paint*Creator*' } | Select-Object -First 1
+          if ($null -eq $exe) { $exe = $allExe[0] }
+          (Get-FileHash $exe.FullName -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content (Join-Path $env:OUT 'EXE.sha256')
+          Copy-Item (Join-Path $env:RUNNER_TEMP 'model-smoke.log') (Join-Path $env:OUT 'MODEL_VIEWER_SMOKE_TEST.txt') -Force
+          Get-ChildItem -LiteralPath $env:OUT | Select-Object Name,Length | Format-Table -AutoSize | Out-File (Join-Path $env:OUT 'BUILD_MANIFEST.txt')
+
+      - name: Upload compiled app
+        uses: actions/upload-artifact@v4
+        with:
+          name: MXB-Race-Day-Live-Paint-Creator-v5.0.0-real-3d-viewer-win-x64
+          path: ${{ env.OUT }}
+          if-no-files-found: error
+          retention-days: 7
