@@ -30,33 +30,18 @@ jobs:
 
           theme_path = root / 'ThemeArt.cs'
           theme = theme_path.read_text(encoding='utf-8')
-          old_theme = 'Stretch = Stretch.UniformToFill,'
-          if old_theme not in theme:
+          theme_count = theme.count('Stretch = Stretch.UniformToFill,')
+          if theme_count < 1:
               raise SystemExit('ThemeArt image stretch setting was not found')
-          theme = theme.replace(old_theme, 'Stretch = Stretch.Uniform,', 1)
+          theme = theme.replace('Stretch = Stretch.UniformToFill,', 'Stretch = Stretch.Uniform,')
           theme_path.write_text(theme, encoding='utf-8')
 
           profile_path = root / 'ProfileHomeFeature.cs'
           profile = profile_path.read_text(encoding='utf-8')
-          old_profile = '''var brush = new ImageBrush(bitmap)
-            {
-                Stretch = Stretch.UniformToFill,
-                AlignmentX = AlignmentX.Center,
-                AlignmentY = AlignmentY.Center
-            };'''
-          new_profile = '''var brush = new ImageBrush(bitmap)
-            {
-                // Fit the complete image inside its existing UI box without stretching or
-                // clipping away the edges. The surrounding panel remains responsible for
-                // the box size, border, rounded corners, and background fill.
-                Stretch = Stretch.Uniform,
-                AlignmentX = AlignmentX.Center,
-                AlignmentY = AlignmentY.Center,
-                TileMode = TileMode.None
-            };'''
-          if old_profile not in profile:
-              raise SystemExit('Profile image brush block was not found')
-          profile = profile.replace(old_profile, new_profile, 1)
+          profile_count = profile.count('Stretch = Stretch.UniformToFill,')
+          if profile_count < 1:
+              raise SystemExit('No profile image brushes using UniformToFill were found')
+          profile = profile.replace('Stretch = Stretch.UniformToFill,', 'Stretch = Stretch.Uniform,')
           profile_path.write_text(profile, encoding='utf-8')
 
           project_path = root / 'MXBRaceDayLive.Profile.csproj'
@@ -64,13 +49,17 @@ jobs:
           project = re.sub(r'<Version>[^<]+</Version>', '<Version>1.0.20</Version>', project, count=1)
           project_path.write_text(project, encoding='utf-8')
 
+          print(f'Updated {theme_count} embedded theme brush(es) and {profile_count} profile image brush(es).')
+
       - name: Verify image-fit patch
         shell: bash
         run: |
           set -euo pipefail
           grep -q '<Version>1.0.20</Version>' native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          ! grep -q 'Stretch = Stretch.UniformToFill,' native-race-day-live/src/MXBRaceDayLive.Profile/ThemeArt.cs
+          ! grep -q 'Stretch = Stretch.UniformToFill,' native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
           grep -q 'Stretch = Stretch.Uniform,' native-race-day-live/src/MXBRaceDayLive.Profile/ThemeArt.cs
-          grep -q 'TileMode = TileMode.None' native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
+          grep -q 'Stretch = Stretch.Uniform,' native-race-day-live/src/MXBRaceDayLive.Profile/ProfileHomeFeature.cs
 
       - name: Commit v1.0.20 image fit
         shell: bash
