@@ -322,7 +322,7 @@ internal static class FrostBikePreviewProvider
             try
             {
                 if (predicate(root)) return root;
-                var all = root.FindAll(TreeScope.Descendants, Condition.TrueCondition);
+                var all = root.FindAll(TreeScope.Descendants, System.Windows.Automation.Condition.TrueCondition);
                 for (var i = 0; i < all.Count; i++)
                 {
                     try { if (predicate(all[i])) return all[i]; }

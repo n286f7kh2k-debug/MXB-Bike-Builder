@@ -11,8 +11,4 @@
   <ItemGroup>
     <ProjectReference Include="../MXBRaceDayLive.Contracts/MXBRaceDayLive.Contracts.csproj" />
   </ItemGroup>
-  <ItemGroup>
-    <Reference Include="UIAutomationClient" />
-    <Reference Include="UIAutomationTypes" />
-  </ItemGroup>
 </Project>
