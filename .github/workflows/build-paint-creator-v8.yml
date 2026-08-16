@@ -53,18 +53,22 @@ jobs:
         run: |
           $test=Join-Path $env:RUNNER_TEMP 'v8-hotswap';New-Item -ItemType Directory -Force $test|Out-Null
           $contracts=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Contracts\MXBRaceDayLive.PaintCreator.Contracts.csproj';$demo=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo\MXBRaceDayLive.PaintCreator.Demo.csproj'
-          @"<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><ProjectReference Include="$contracts"/><ProjectReference Include="$demo"/></ItemGroup></Project>"@|Set-Content (Join-Path $test 'HotSwap.csproj')
+          @"
+          <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><ProjectReference Include="$contracts"/><ProjectReference Include="$demo"/></ItemGroup></Project>
+          "@ | Set-Content (Join-Path $test 'HotSwap.csproj')
           @'
           using System.IO;using MXBRaceDayLive.PaintCreator.Contracts;using MXBRaceDayLive.PaintCreator.Demo;
           internal sealed class Services:IPaintCreatorHostServices{public Task<HostPaintOffer> GetExportOfferAsync(HostPaintExportRequest r,CancellationToken c=default)=>Task.FromResult(new HostPaintOffer(r.ProductId,"TEST",1m,"USD"));public Task<HostPaintAuthorization> CheckExportAsync(HostPaintExportRequest r,CancellationToken c=default)=>Task.FromResult(new HostPaintAuthorization(true,"OK"));public Task<HostPaintAuthorization> PurchaseExportAsync(HostPaintExportRequest r,CancellationToken c=default)=>Task.FromResult(new HostPaintAuthorization(true,"OK"));}
           internal static class Program{[STAThread]static void Main(){var app=new System.Windows.Application();var dir=Environment.GetEnvironmentVariable("MODULE")!;var root=Path.Combine(Path.GetTempPath(),"mxb-v8-state-"+Guid.NewGuid().ToString("N"));var s=PaintCreatorModuleSession.Load(dir,new PaintCreatorHostOptions(root,"ci"),new Services());var state=s.Module.CaptureState();if(!s.Module.ModuleVersion.StartsWith("8.0.0"))throw new Exception("wrong version "+s.Module.ModuleVersion);s.Module.RestoreState(state);Console.WriteLine("HOT_SWAP_READY VERSION="+s.Module.ModuleVersion);s.Dispose();}}
-          '@|Set-Content (Join-Path $test 'Program.cs')
-          $env:MODULE=$env:MODULE;dotnet run --project (Join-Path $test 'HotSwap.csproj') -c Release
+          '@ | Set-Content (Join-Path $test 'Program.cs')
+          dotnet run --project (Join-Path $test 'HotSwap.csproj') -c Release
       - name: Real rider viewer regression
         shell: pwsh
         run: |
           $s=Join-Path $env:RUNNER_TEMP 'v8-viewer';New-Item -ItemType Directory -Force $s|Out-Null;$lib=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
-          @"<Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><ProjectReference Include="$lib"/></ItemGroup></Project>"@|Set-Content (Join-Path $s 'Viewer.csproj')
+          @"
+          <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><ProjectReference Include="$lib"/></ItemGroup></Project>
+          "@ | Set-Content (Join-Path $s 'Viewer.csproj')
           'using System.IO;using MXBRaceDayLive.PaintCreator.Models;using MXBRaceDayLive.PaintCreator.Services;var root=Path.Combine(Path.GetTempPath(),"mxb-v8-viewer-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);var r=await new OfficialMxBikesPreviewModelService().ResolveAsync(PaintTargetType.Rider,new PaintCreatorContext{ProjectRoot=root});if(!r.Ready||string.IsNullOrWhiteSpace(r.ObjPath))throw new Exception(r.Status);var m=ObjUvMeshLoader.Load(r.ObjPath);Console.WriteLine($"POSITIONS={m.Positions.Count} TRIANGLES={m.TriangleIndices.Count/3} UVS={m.TextureCoordinates.Count}");if(m.Positions.Count<100||m.TextureCoordinates.Count!=m.Positions.Count)throw new Exception("viewer regression");'|Set-Content (Join-Path $s 'Program.cs')
           dotnet run --project (Join-Path $s 'Viewer.csproj') -c Release
       - name: Publish v8 in app update feed
