@@ -1,6 +1,6 @@
 {
-  "version": "0.3.3",
-  "filename": "MXB_Race_Day_Live_v0_3_3_UPDATE.zip",
-  "notes": "Inspection pass only; no release publication.",
-  "builder_script": "race-control/inspect_v033_profile_bikes.py"
+  "version": "0.3.4",
+  "filename": "MXB_Race_Day_Live_v0_3_4_UPDATE.zip",
+  "notes": "MXB Race Day Live v0.3.4: adds Profile > Bikes with MX Bikes-native bike/rider/helmet/gear selections, custom mod and .pnt scanning, direct profile.ini application with a safety backup, and the Race Day Live logo as the Windows taskbar identity/icon. Existing one-click race joining and all current systems are preserved.",
+  "builder_script": "race-control/build_v034_profile_bikes.py"
 }
