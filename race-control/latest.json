@@ -1,6 +1,6 @@
 {
-  "version": "0.5.0",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_5_0_UPDATE.zip",
-  "sha256": "ae046382961b260bee4a8db7ea7f14a9c8703a14fbc0838d26de38749e632ea8",
-  "notes": "MXB Race Day Live v0.5.0: unifies the in-app updater onto the Race Day Live channel, moves the version above the legacy MXB Bike Builder 0.4.x line so updates can no longer be blocked by the old product version, bypasses stale GitHub manifest caching, verifies SHA-256 before install, installs without deleting rider/settings data, and restarts through the hidden Windows launcher. Existing Race Day Live features from v0.3.9 are preserved."
+  "version": "0.5.1",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/race-control/releases/MXB_Race_Day_Live_v0_5_1_UPDATE.zip",
+  "sha256": "f34c9bfab5531898d0fe00f4c8ceb1b5bb9a2cb5f9be35973d11e49f03eb2c2c",
+  "notes": "MXB Race Day Live v0.5.1: performance hotfix and Garage renderer rebuild. The Garage no longer draws thousands of Tk polygons on the UI thread; model discovery, parsing and rasterization run on one background worker and Tk receives one completed frame. Garage drag/zoom/resize redraws are debounced, pending work is cancelled when leaving Garage, source meshes are bounded for smooth interaction, and OBJ/STL/PLY source geometry is supported. EDF-only bikes remain fully selectable/synced but are never launched through MX Bikes. Windows taskbar icon discovery is cached so repeated window-map events no longer spawn PowerShell repeatedly. SQLite desktop-cache pragmas reduce database filesystem churn while preserving transaction semantics. v0.5.0 updater/restart fixes, race joining, memberships, wallet, purse/fastest-lap economics, track art, live timing and admin controls are preserved."
 }
