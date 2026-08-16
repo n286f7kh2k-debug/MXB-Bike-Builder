@@ -1,0 +1,50 @@
+name: Fix v1.0.10 update and iNsane runtime
+
+on:
+  push:
+    branches: [native-rebuild]
+    paths:
+      - '.github/workflows/fix-v1010-update-and-runtime.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: native-rebuild
+
+      - name: Move runtime bootstrap out of module activation
+        shell: python
+        run: |
+          from pathlib import Path
+
+          provider = Path('native-race-day-live/src/MXBRaceDayLive.Profile/InsaneBikePreviewProvider.cs')
+          text = provider.read_text(encoding='utf-8')
+          old = '''            var process = Process.Start(new ProcessStartInfo(executable)\n            {\n                UseShellExecute = true,\n                WorkingDirectory = Path.GetDirectoryName(executable) ?? string.Empty,\n                WindowStyle = ProcessWindowStyle.Hidden\n            }) ?? throw new InvalidOperationException("Race Day Live could not start its internal iNsane preview component.");'''
+          new = '''            var runtimeRoot = await InsaneDotNetRuntime.EnsureAsync(cancellationToken);\n            var startInfo = new ProcessStartInfo(executable)\n            {\n                UseShellExecute = false,\n                CreateNoWindow = true,\n                WorkingDirectory = Path.GetDirectoryName(executable) ?? string.Empty,\n                WindowStyle = ProcessWindowStyle.Hidden\n            };\n            startInfo.Environment["DOTNET_ROOT"] = runtimeRoot;\n            startInfo.Environment["DOTNET_ROOT_X64"] = runtimeRoot;\n            startInfo.Environment["DOTNET_MULTILEVEL_LOOKUP"] = "0";\n\n            var process = Process.Start(startInfo)\n                ?? throw new InvalidOperationException("Race Day Live could not start its internal iNsane preview component.");'''
+          if old not in text:
+              raise SystemExit('Could not find iNsane Process.Start block')
+          provider.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          bootstrap = Path('native-race-day-live/src/MXBRaceDayLive.Profile/InsaneRuntimeModuleBootstrap.cs')
+          bootstrap.write_text('''namespace MXBRaceDayLive.Profile;\n\n// Runtime provisioning is intentionally lazy. Network/runtime preparation must never run\n// during hot-module activation because a failed bootstrap would make the app update fail.\ninternal static class InsaneRuntimeModuleBootstrap\n{\n}\n''', encoding='utf-8')
+
+          project = Path('native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj')
+          csproj = project.read_text(encoding='utf-8')
+          csproj = csproj.replace('<Version>1.0.9</Version>', '<Version>1.0.10</Version>')
+          if '<Version>1.0.10</Version>' not in csproj:
+              raise SystemExit('Could not bump profile version to 1.0.10')
+          project.write_text(csproj, encoding='utf-8')
+
+      - name: Commit v1.0.10 repair
+        shell: pwsh
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add native-race-day-live/src/MXBRaceDayLive.Profile/InsaneBikePreviewProvider.cs native-race-day-live/src/MXBRaceDayLive.Profile/InsaneRuntimeModuleBootstrap.cs native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj
+          git commit -m "Fix hot update and lazy iNsane runtime bootstrap"
+          git push origin native-rebuild
