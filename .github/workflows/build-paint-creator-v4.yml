@@ -22,44 +22,52 @@ jobs:
         run: |
           $ErrorActionPreference = 'Stop'
           function Raw([string]$p) { return ((Get-Content -Raw $p) -replace '\s','') }
-
           $p01 = (Raw 'ci-paint-v4-repair/p01_0.txt') + (Raw 'ci-paint-v4-repair/p01_1.txt') + (Raw 'ci-paint-v4-repair/p01_2.txt')
           $p06 = (Raw 'ci-paint-v4-repair/p06_0.txt') + (Raw 'ci-paint-v4-repair/p06_1.txt') + (Raw 'ci-paint-v4-repair/p06_2.txt')
           $p09 = (Raw 'ci-paint-v4-repair/p09s_0.txt') + (Raw 'ci-paint-v4-repair/p09s_1.txt') + (Raw 'ci-paint-v4-repair/p09s_2.txt') + (Raw 'ci-paint-v4-repair/p09s_3.txt') + (Raw 'ci-paint-v4-repair/p09s_4.txt')
           $p10 = (Raw 'ci-paint-v4-repair/p10s_0.txt') + (Raw 'ci-paint-v4-repair/p10s_1.txt') + (Raw 'ci-paint-v4-repair/p10s_2.txt') + (Raw 'ci-paint-v4-repair/p10s_3.txt') + (Raw 'ci-paint-v4-repair/p10s_4.txt')
-
           $b64 = $p01
           foreach ($n in 2..5) { $b64 += Raw ("ci-paint-v4/part{0:D2}.txt" -f $n) }
           $b64 += $p06
           foreach ($n in 7..8) { $b64 += Raw ("ci-paint-v4/part{0:D2}.txt" -f $n) }
           $b64 += $p09
           $b64 += $p10
-
           $zip = Join-Path $env:RUNNER_TEMP 'paint-v4-source.zip'
           [IO.File]::WriteAllBytes($zip, [Convert]::FromBase64String($b64))
           $hash = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
           Write-Host "Source SHA256: $hash"
-          if ($hash -ne '4d4a4e2c81b4210530d1993da89a859ea02f3c4eb870748de3ef85dabd1bd7c9') {
-            throw "SOURCE HASH MISMATCH: $hash"
-          }
-
+          if ($hash -ne '4d4a4e2c81b4210530d1993da89a859ea02f3c4eb870748de3ef85dabd1bd7c9') { throw "SOURCE HASH MISMATCH: $hash" }
           $src = Join-Path $env:RUNNER_TEMP 'paint-v4-source'
           Expand-Archive -Path $zip -DestinationPath $src -Force
           "SRC=$src" >> $env:GITHUB_ENV
 
       - name: Build self-contained Windows app
+        id: compile
+        continue-on-error: true
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
           $proj = Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo\MXBRaceDayLive.PaintCreator.Demo.csproj'
           $out = Join-Path $env:RUNNER_TEMP 'paint-v4-publish'
-          dotnet publish $proj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.29 -p:TargetLatestRuntimePatch=false -p:PublishSingleFile=false -o $out
+          $log = Join-Path $env:RUNNER_TEMP 'paint-v4-build.log'
           "OUT=$out" >> $env:GITHUB_ENV
+          "BUILD_LOG=$log" >> $env:GITHUB_ENV
+          dotnet publish $proj -c Release -r win-x64 --self-contained true -p:RuntimeFrameworkVersion=8.0.29 -p:TargetLatestRuntimePatch=false -p:PublishSingleFile=false -o $out *>&1 | Tee-Object -FilePath $log
+          $code = $LASTEXITCODE
+          if ($code -ne 0) { exit $code }
+
+      - name: Upload compiler diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: Paint-Creator-v4-compiler-log
+          path: ${{ env.BUILD_LOG }}
+          retention-days: 7
 
       - name: Validate Windows build
+        if: always()
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
+          if ('${{ steps.compile.outcome }}' -ne 'success') { throw 'Windows compile failed. See compiler log artifact.' }
           $exe = Join-Path $env:OUT 'MXB Race Day Live - Paint Creator.exe'
           $dll = Join-Path $env:OUT 'MXBRaceDayLive.PaintCreator.dll'
           if (!(Test-Path $exe)) { throw 'EXE missing' }
@@ -68,6 +76,7 @@ jobs:
           (Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant() | Set-Content (Join-Path $env:OUT 'EXE.sha256')
 
       - name: Upload compiled app
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: MXB-Race-Day-Live-Paint-Creator-v4.0.0-win-x64
