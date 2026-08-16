@@ -19,6 +19,8 @@ Fresh native Windows rebuild. The previous Python-hosted application is intentio
 
 Theme work must preserve the existing page structure and feature order unless the user explicitly asks for a layout change. The v1.0.17 theme pass keeps the current layout intact while using the supplied MXB Race Day Live reference artwork directly inside the existing hero/banner treatment, adds image-backed Garage and Settings cards, image-backed sub-page headers, brighter cyan game-HUD borders, stronger glow, and a faint cinematic motocross backdrop. No sidebar, dashboard rearrangement, new module, or new feature is introduced as part of this theme-only pass.
 
+Starting with v1.0.20, theme and user-supplied images are fitted inside their existing UI boxes with preserved aspect ratio instead of being cropped by `UniformToFill`. Layout geometry and section placement remain unchanged.
+
 ## First checkpoint
 
 The first checkpoint intentionally contains only the native shell, profile-card home feature, persistent rider profile, MX Bikes environment/profile detection, Launch MX Bikes, and the live feature updater. Larger race-day systems are being added back one at a time after the native foundation is validated.
