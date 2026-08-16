@@ -6,6 +6,8 @@ on:
     paths:
       - 'native-race-day-live/src/**'
       - 'native-race-day-live/README.md'
+      - 'race-control/frost-decoder/**'
+      - 'race-control/FROST_THIRD_PARTY_NOTICE.txt'
       - 'race-control/launcher/mxb_race_day_live.ico'
       - '.github/workflows/native-race-day-live-build.yml'
   workflow_dispatch:
@@ -27,15 +29,17 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Fetch pinned Frost EDF parser
+      - name: Fetch pinned Frost bike parser sources
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
-          $dest = 'race-control/frost-decoder/src/edf.rs'
-          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
-          $url = 'https://raw.githubusercontent.com/Frostn1/mxb-app/2d3775a8d2931d2dd295f6211e0073293a805353/src-tauri/src/edf.rs'
-          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest
-          if ((Get-Content $dest -Raw) -notmatch 'EDF\\0') { throw 'Pinned Frost EDF parser did not contain the EDF signature' }
+          $root = 'https://raw.githubusercontent.com/Frostn1/mxb-app/2d3775a8d2931d2dd295f6211e0073293a805353/src-tauri/src'
+          $src = 'race-control/frost-decoder/src'
+          New-Item -ItemType Directory -Force -Path $src | Out-Null
+          Invoke-WebRequest -UseBasicParsing -Uri "$root/edf.rs" -OutFile "$src/edf.rs"
+          Invoke-WebRequest -UseBasicParsing -Uri "$root/cfg.rs" -OutFile "$src/cfg.rs"
+          if ((Get-Content "$src/edf.rs" -Raw) -notmatch 'EDF\\0') { throw 'Pinned Frost EDF parser did not contain the EDF signature' }
+          if ((Get-Content "$src/cfg.rs" -Raw) -notmatch 'parse_gfx') { throw 'Pinned Frost CFG parser did not contain parse_gfx' }
 
       - name: Build native MX Bikes EDF decoder
         shell: pwsh
