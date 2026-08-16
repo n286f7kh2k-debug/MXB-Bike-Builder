@@ -27,6 +27,27 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
+      - name: Fetch pinned Frost EDF parser
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $dest = 'race-control/frost-decoder/src/edf.rs'
+          New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+          $url = 'https://raw.githubusercontent.com/Frostn1/mxb-app/2d3775a8d2931d2dd295f6211e0073293a805353/src-tauri/src/edf.rs'
+          Invoke-WebRequest -UseBasicParsing -Uri $url -OutFile $dest
+          if ((Get-Content $dest -Raw) -notmatch 'EDF\\0') { throw 'Pinned Frost EDF parser did not contain the EDF signature' }
+
+      - name: Build native MX Bikes EDF decoder
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          cargo build --manifest-path race-control/frost-decoder/Cargo.toml --release
+          New-Item -ItemType Directory -Force -Path native-out/viewer-assets | Out-Null
+          Copy-Item race-control/frost-decoder/target/release/mxb_asset_decoder.exe native-out/viewer-assets/mxb_asset_decoder.exe -Force
+          Copy-Item race-control/FROST_THIRD_PARTY_NOTICE.txt native-out/viewer-assets/Frost-mxb-app-MIT.txt -Force
+          $bytes = [System.IO.File]::ReadAllBytes('native-out/viewer-assets/mxb_asset_decoder.exe')
+          if ($bytes.Length -lt 2 -or $bytes[0] -ne 0x4d -or $bytes[1] -ne 0x5a) { throw 'MX Bikes EDF decoder is not a Windows PE executable' }
+
       - name: Restore contracts
         run: dotnet restore native-race-day-live/src/MXBRaceDayLive.Contracts/MXBRaceDayLive.Contracts.csproj
 
@@ -52,19 +73,32 @@ jobs:
           New-Item -ItemType Directory -Force -Path $moduleDir | Out-Null
           Copy-Item 'native-out/profile-build/MXBRaceDayLive.Profile.dll' "$moduleDir/MXBRaceDayLive.Profile.dll" -Force
 
+      - name: Install bundled 3D viewer assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path 'native-out/app/Tools' | Out-Null
+          New-Item -ItemType Directory -Force -Path 'native-out/app/THIRD_PARTY_NOTICES' | Out-Null
+          Copy-Item 'native-out/viewer-assets/mxb_asset_decoder.exe' 'native-out/app/Tools/mxb_asset_decoder.exe' -Force
+          Copy-Item 'native-out/viewer-assets/Frost-mxb-app-MIT.txt' 'native-out/app/THIRD_PARTY_NOTICES/Frost-mxb-app-MIT.txt' -Force
+
       - name: Validate native foundation
         shell: pwsh
         run: |
           $exe = 'native-out/app/MXB Race Day Live.exe'
           $module = 'native-out/app/Modules/Bundled/MXBRaceDayLive.Profile.dll'
+          $decoder = 'native-out/app/Tools/mxb_asset_decoder.exe'
           if (!(Test-Path $exe)) { throw 'MXB Race Day Live.exe was not produced' }
           if (!(Test-Path $module)) { throw 'Profile feature module was not produced' }
+          if (!(Test-Path $decoder)) { throw 'MX Bikes EDF decoder was not produced' }
           $info = [System.Diagnostics.FileVersionInfo]::GetVersionInfo((Resolve-Path $exe))
           if ($info.ProductName -ne 'MXB Race Day Live') { throw "Wrong ProductName: $($info.ProductName)" }
           if ($info.FileDescription -ne 'MXB Race Day Live') { throw "Wrong FileDescription: $($info.FileDescription)" }
           if ((Get-Item $exe).Length -lt 100000) { throw 'Native executable is unexpectedly small' }
+          $decoderBytes = [System.IO.File]::ReadAllBytes($decoder)
+          if ($decoderBytes[0] -ne 0x4d -or $decoderBytes[1] -ne 0x5a) { throw 'Bundled EDF decoder is invalid' }
           Write-Host "Validated native executable: $($info.ProductName) v$($info.FileVersion)"
           Write-Host 'Python runtime is not part of this project or launch path.'
+          Write-Host 'Native Garage 3D pipeline is present without launching MX Bikes.'
 
       - name: Publish live profile update channel
         if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
@@ -93,15 +127,30 @@ jobs:
           } | ConvertTo-Json
           Set-Content -Path 'native-race-day-live/updates/latest.json' -Value $manifest -Encoding utf8
 
+          $assetDir = 'native-race-day-live/updates/assets'
+          New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
+          Copy-Item 'native-out/viewer-assets/mxb_asset_decoder.exe' "$assetDir/mxb_asset_decoder.exe" -Force
+          Copy-Item 'native-out/viewer-assets/Frost-mxb-app-MIT.txt' "$assetDir/Frost-mxb-app-MIT.txt" -Force
+          $decoderSha = (Get-FileHash "$assetDir/mxb_asset_decoder.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
+          $decoderUrl = "https://raw.githubusercontent.com/${{ github.repository }}/native-rebuild/native-race-day-live/updates/assets/mxb_asset_decoder.exe"
+          $noticeUrl = "https://raw.githubusercontent.com/${{ github.repository }}/native-rebuild/native-race-day-live/updates/assets/Frost-mxb-app-MIT.txt"
+          $assetManifest = [ordered]@{
+            decoderUrl = $decoderUrl
+            sha256 = $decoderSha
+            noticeUrl = $noticeUrl
+          } | ConvertTo-Json
+          Set-Content -Path 'native-race-day-live/updates/viewer-assets.json' -Value $assetManifest -Encoding utf8
+
           Write-Host "Publishing live module v$version"
-          Write-Host "SHA-256: $sha"
+          Write-Host "Module SHA-256: $sha"
+          Write-Host "EDF decoder SHA-256: $decoderSha"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- 'native-race-day-live/updates/latest.json' 'native-race-day-live/updates/modules'
+          git add -- 'native-race-day-live/updates/latest.json' 'native-race-day-live/updates/modules' 'native-race-day-live/updates/viewer-assets.json' 'native-race-day-live/updates/assets'
           if (git diff --cached --quiet) {
             Write-Host 'Live update channel is already current.'
           } else {
-            git commit -m "Publish native profile module v$version [skip ci]"
+            git commit -m "Publish native profile module v$version and 3D viewer assets [skip ci]"
             git push origin HEAD:native-rebuild
           }
 
