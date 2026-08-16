@@ -145,12 +145,21 @@ jobs:
               Path(path).unlink(missing_ok=True)
           PY
 
+      - name: Upload assembled v0.5.11 release
+        uses: actions/upload-artifact@v4
+        with:
+          name: mxb-v0511-release
+          path: |
+            race-control/releases/MXB_Race_Day_Live_v0_5_11_UPDATE.zip
+            race-control/latest.json
+          if-no-files-found: error
+
       - name: Commit release
         shell: bash
         run: |
           git config user.name "MXB Race Control Update Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add -A race-control/releases race-control/latest.json race-control/staging
+          git add -A race-control/releases race-control/latest.json
           if git diff --cached --quiet; then
             echo "Nothing to publish."
             exit 0
