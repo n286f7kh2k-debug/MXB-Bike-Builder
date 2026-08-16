@@ -11,7 +11,7 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     private IRaceDayContext? _context;
 
     public string Id => "profile-home";
-    public Version Version => new(1, 0, 0);
+    public Version Version => new(1, 0, 1);
 
     public FrameworkElement CreateView(IRaceDayContext context)
     {
@@ -131,6 +131,17 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
         AddStat(stats, 3, "WINS / PODIUMS", "0 / 0", "#F2F7FB");
         stack.Children.Add(stats);
 
+        stack.Children.Add(SectionTitle("GARAGE", ""));
+        stack.Children.Add(new Border
+        {
+            Background = Brush("#071A29"),
+            BorderBrush = Brush("#155273"),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(18),
+            MinHeight = 110,
+            Margin = new Thickness(0, 0, 0, 18)
+        });
+
         stack.Children.Add(SectionTitle("MY RACES", "Your registered and completed races will live with your rider profile."));
         var races = Card(new Thickness(0, 0, 0, 18));
         var racesStack = new StackPanel { Margin = new Thickness(22) };
@@ -174,7 +185,8 @@ public sealed class ProfileHomeFeature : IRaceDayFeature
     {
         var stack = new StackPanel { Margin = new Thickness(2, 0, 0, 10) };
         stack.Children.Add(Label(title, 18, "#F2F7FB", true));
-        stack.Children.Add(Label(subtitle, 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
+        if (!string.IsNullOrWhiteSpace(subtitle))
+            stack.Children.Add(Label(subtitle, 11, "#88A5BA", false, new Thickness(0, 3, 0, 0)));
         return stack;
     }
 
