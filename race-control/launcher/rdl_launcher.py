@@ -1,90 +1,57 @@
 from __future__ import annotations
 
-import os
-import runpy
-import site
+import subprocess
 import sys
-import traceback
 from pathlib import Path
 
-# Force core desktop UI dependencies into the PyInstaller host. The installed
-# source tree stays external so the in-app updater can keep updating it.
-import tkinter  # noqa: F401
-try:
-    from PIL import Image as _PIL_Image  # noqa: F401
-except Exception:
-    _PIL_Image = None
 
-
-def _add_runtime_packages(root: Path) -> None:
-    """Expose the existing app venv packages to the branded host process."""
-    candidates = [root / '.venv' / 'Lib' / 'site-packages']
+def _runtime_path(root: Path) -> Path | None:
     hint = root / 'assets' / 'bin' / 'rdl_runtime.txt'
     try:
         if hint.is_file():
             raw = hint.read_text(encoding='utf-8').strip().strip('"')
             if raw:
-                runtime = Path(raw)
-                if not runtime.is_absolute():
-                    runtime = (root / runtime).resolve()
-                candidates.append(runtime.parent.parent / 'Lib' / 'site-packages')
+                candidate = Path(raw)
+                if not candidate.is_absolute():
+                    candidate = (root / candidate).resolve()
+                if candidate.is_file():
+                    return candidate
     except Exception:
         pass
 
-    seen = set()
-    for folder in candidates:
-        try:
-            folder = folder.resolve()
-            key = str(folder).lower()
-            if key in seen or not folder.is_dir():
-                continue
-            seen.add(key)
-            site.addsitedir(str(folder))
-        except Exception:
-            pass
-
-
-def _show_fatal(message: str) -> None:
-    if os.name == 'nt':
-        try:
-            import ctypes
-            ctypes.windll.user32.MessageBoxW(None, message, 'MXB Race Day Live', 0x10)
-            return
-        except Exception:
-            pass
-    try:
-        sys.stderr.write(message + '\n')
-    except Exception:
-        pass
+    for candidate in (
+        root / '.venv' / 'Scripts' / 'pythonw.exe',
+        root / 'pythonw.exe',
+    ):
+        if candidate.is_file():
+            return candidate
+    return None
 
 
 def main() -> int:
     root = Path(sys.executable).resolve().parent
     app = root / 'app.py'
-    if not app.is_file():
-        _show_fatal(f'Race Day Live could not find its app runtime:\n{app}')
+    runtime = _runtime_path(root)
+    if runtime is None or not app.is_file():
         return 2
 
     try:
-        os.chdir(root)
-        root_text = str(root)
-        if root_text not in sys.path:
-            sys.path.insert(0, root_text)
-        _add_runtime_packages(root)
-
-        # Execute app.py inside this process. There is no pythonw child process,
-        # so Windows sees MXB Race Day Live.exe as the actual app owner.
-        sys.argv = [str(app), *sys.argv[1:]]
-        runpy.run_path(str(app), run_name='__main__')
+        env = dict(__import__('os').environ)
+        # Never pass PyInstaller one-file parent/child state into the external runtime.
+        # This prevents the v0.5.13 parent-process security validation failure.
+        for key in tuple(env):
+            if key.startswith('_PYI_') or key.startswith('PYINSTALLER_'):
+                env.pop(key, None)
+        subprocess.Popen(
+            [str(runtime), str(app), *sys.argv[1:]],
+            cwd=str(root),
+            env=env,
+            creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0),
+            close_fds=True,
+        )
+        # Exit immediately so updater can replace this launcher on future updates.
         return 0
-    except SystemExit as exc:
-        try:
-            return int(exc.code or 0)
-        except Exception:
-            return 0
     except Exception:
-        detail = traceback.format_exc()
-        _show_fatal('MXB Race Day Live could not start.\n\n' + detail[-6000:])
         return 4
 
 
