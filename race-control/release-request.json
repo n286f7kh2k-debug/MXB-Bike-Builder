@@ -1,7 +1,7 @@
 {
   "version": "0.5.0",
   "filename": "MXB_Race_Day_Live_v0_5_0_UPDATE.zip",
-  "notes": "MXB Race Day Live v0.5.0: unifies the in-app updater onto the Race Day Live channel, moves the version above the legacy MXB Bike Builder 0.4.x line so updates can no longer be blocked by the old product version, bypasses stale GitHub manifest caching, verifies SHA-256 before install, installs without deleting rider/settings data, and restarts through the hidden Windows launcher. Existing Race Day Live features from v0.3.9 are preserved.",
-  "builder_script": "race-control/build_v050_updater_unification.py",
-  "rebuild_attempt": 1
+  "notes": "MXB Race Day Live v0.5.0 current package inspection pass.",
+  "builder_script": "race-control/inspect_v050_ui.py",
+  "rebuild_attempt": "ui-inspection"
 }
