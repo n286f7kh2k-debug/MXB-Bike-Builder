@@ -154,17 +154,82 @@ jobs:
             race-control/latest.json
           if-no-files-found: error
 
-      - name: Commit release
+      - name: Publish release through GitHub API
         shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          git config user.name "MXB Race Control Update Bot"
-          git config user.email "actions@users.noreply.github.com"
-          git add -A race-control/releases race-control/latest.json
-          if git diff --cached --quiet; then
-            echo "Nothing to publish."
-            exit 0
-          fi
-          VERSION=$(python -c "import json; print(json.load(open('race-control/release-request.json'))['version'])")
-          git commit -m "Publish MXB Race Control v${VERSION}"
-          git pull --rebase origin main
-          git push
+          python - <<'PY'
+          import base64
+          import json
+          import os
+          import time
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          repo = os.environ['GITHUB_REPOSITORY']
+          token = os.environ['GH_TOKEN']
+          api = f'https://api.github.com/repos/{repo}'
+          release_path = 'race-control/releases/MXB_Race_Day_Live_v0_5_11_UPDATE.zip'
+          manifest_path = 'race-control/latest.json'
+          release = Path(release_path)
+          manifest = Path(manifest_path)
+          if not release.is_file() or not manifest.is_file():
+              raise SystemExit('assembled release files are missing')
+
+          headers = {
+              'Authorization': f'Bearer {token}',
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+              'User-Agent': 'MXB-Race-Day-Live-Release-Bot',
+          }
+
+          def call(method, path, payload=None):
+              data = None if payload is None else json.dumps(payload).encode('utf-8')
+              req = urllib.request.Request(api + path, data=data, headers=headers, method=method)
+              try:
+                  with urllib.request.urlopen(req, timeout=180) as response:
+                      body = response.read()
+                      return json.loads(body.decode('utf-8')) if body else {}
+              except urllib.error.HTTPError as exc:
+                  detail = exc.read().decode('utf-8', 'replace')
+                  raise RuntimeError(f'GitHub API {method} {path} failed: {exc.code} {detail}') from exc
+
+          release_blob = call('POST', '/git/blobs', {
+              'content': base64.b64encode(release.read_bytes()).decode('ascii'),
+              'encoding': 'base64',
+          })['sha']
+          manifest_blob = call('POST', '/git/blobs', {
+              'content': manifest.read_text(encoding='utf-8'),
+              'encoding': 'utf-8',
+          })['sha']
+
+          entries = [
+              {'path': release_path, 'mode': '100644', 'type': 'blob', 'sha': release_blob},
+              {'path': manifest_path, 'mode': '100644', 'type': 'blob', 'sha': manifest_blob},
+          ]
+
+          last_error = None
+          for attempt in range(1, 6):
+              try:
+                  head = call('GET', '/git/ref/heads/main')['object']['sha']
+                  base_tree = call('GET', f'/git/commits/{head}')['tree']['sha']
+                  tree = call('POST', '/git/trees', {'base_tree': base_tree, 'tree': entries})['sha']
+                  commit = call('POST', '/git/commits', {
+                      'message': 'Publish MXB Race Control v0.5.11',
+                      'tree': tree,
+                      'parents': [head],
+                  })['sha']
+                  call('PATCH', '/git/refs/heads/main', {'sha': commit, 'force': False})
+                  print(f'Published v0.5.11 at commit {commit}')
+                  break
+              except Exception as exc:
+                  last_error = exc
+                  if attempt == 5:
+                      raise
+                  print(f'Publish race on attempt {attempt}: {exc}; retrying against current main')
+                  time.sleep(attempt * 2)
+          else:
+              raise last_error or RuntimeError('release publish failed')
+          PY
