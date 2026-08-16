@@ -86,6 +86,12 @@ jobs:
           New-Item -ItemType Directory -Force -Path native-out/profile-build | Out-Null
           dotnet build native-race-day-live/src/MXBRaceDayLive.Profile/MXBRaceDayLive.Profile.csproj -c Release -o native-out/profile-build
 
+      - name: Smoke-test hot profile module on Windows
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          dotnet run --project native-race-day-live/src/MXBRaceDayLive.Profile.Smoke/MXBRaceDayLive.Profile.Smoke.csproj -c Release
+
       - name: Publish native Windows shell
         shell: pwsh
         run: |
@@ -108,7 +114,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path 'native-out/app/Tools' | Out-Null
           New-Item -ItemType Directory -Force -Path 'native-out/app/THIRD_PARTY_NOTICES' | Out-Null
           Copy-Item 'native-out/viewer-assets/mxb_asset_decoder.exe' 'native-out/app/Tools/mxb_asset_decoder.exe' -Force
-          Copy-Item 'native-out/viewer-assets/Frost-mxb-app-MIT.txt' 'native-out/app/THIRD_PARTY_NOTICES/Frost-mxb-app-MIT.txt' -Force
+          Copy-Item 'race-control/FROST_THIRD_PARTY_NOTICE.txt' 'native-out/app/THIRD_PARTY_NOTICES/Frost-mxb-app-MIT.txt' -Force
 
       - name: Validate native foundation
         shell: pwsh
@@ -159,7 +165,7 @@ jobs:
           $assetDir = 'native-race-day-live/updates/assets'
           New-Item -ItemType Directory -Force -Path $assetDir | Out-Null
           Copy-Item 'native-out/viewer-assets/mxb_asset_decoder.exe' "$assetDir/mxb_asset_decoder.exe" -Force
-          Copy-Item 'native-out/viewer-assets/Frost-mxb-app-MIT.txt' "$assetDir/Frost-mxb-app-MIT.txt" -Force
+          Copy-Item 'race-control/FROST_THIRD_PARTY_NOTICE.txt' "$assetDir/Frost-mxb-app-MIT.txt" -Force
           $decoderSha = (Get-FileHash "$assetDir/mxb_asset_decoder.exe" -Algorithm SHA256).Hash.ToLowerInvariant()
           $decoderUrl = "https://raw.githubusercontent.com/${{ github.repository }}/native-rebuild/native-race-day-live/updates/assets/mxb_asset_decoder.exe"
           $noticeUrl = "https://raw.githubusercontent.com/${{ github.repository }}/native-rebuild/native-race-day-live/updates/assets/Frost-mxb-app-MIT.txt"
