@@ -1,12 +1,12 @@
 $ErrorActionPreference='Stop'
 $path=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\Services\OfficialMxBikesPreviewModelService.cs'
 @'
+using HelixToolkit.Geometry;
 using HelixToolkit.SharpDX.Assimp;
-using HelixToolkit.SharpDX.Model;
 using HelixToolkit.SharpDX.Model.Scene;
 using MXBRaceDayLive.PaintCreator.Models;
-using SharpDX;
-using System.Globalization;
+using System.IO;
+using System.Numerics;
 using System.Security.Cryptography;
 using System.Text;
 
@@ -53,18 +53,18 @@ public sealed class OfficialMxBikesPreviewModelService : IGearPreviewModelServic
         using var w=new StreamWriter(objPath,false,new UTF8Encoding(false));
         w.WriteLine("# MXB Race Day Live UV cache generated from PiBoSo mxb_rider_template.FBX");
         int vertexBase=1,meshCount=0,triangleCount=0;
-        Walk(scene.Root,Matrix.Identity);
+        Walk(scene.Root,Matrix4x4.Identity);
         w.Flush();
         if(meshCount==0||triangleCount==0||new FileInfo(objPath).Length<256) throw new InvalidDataException("PiBoSo rider FBX imported but contained no usable triangle UV mesh.");
 
-        void Walk(SceneNode node,Matrix parentWorld)
+        void Walk(SceneNode node,Matrix4x4 parentWorld)
         {
-            Matrix world=node.ModelMatrix*parentWorld;
+            Matrix4x4 world=node.ModelMatrix*parentWorld;
             if(node is GeometryNode geo && geo.Geometry is MeshGeometry3D mesh && mesh.Positions is {Count:>0} && mesh.Indices is {Count:>2}) WriteMesh(mesh,world,node.Name);
             if(node is GroupNodeBase group) foreach(var child in group.Items) Walk(child,world);
         }
 
-        void WriteMesh(MeshGeometry3D mesh,Matrix world,string? name)
+        void WriteMesh(MeshGeometry3D mesh,Matrix4x4 world,string? name)
         {
             int count=mesh.Positions!.Count;
             bool hasUv=mesh.TextureCoordinates!=null&&mesh.TextureCoordinates.Count==count;
@@ -72,18 +72,18 @@ public sealed class OfficialMxBikesPreviewModelService : IGearPreviewModelServic
             w.WriteLine($"o {Safe(name)}");
             for(int i=0;i<count;i++)
             {
-                var p=Vector3.TransformCoordinate(mesh.Positions[i],world);
+                Vector3 p=Vector3.Transform(mesh.Positions[i],world);
                 w.WriteLine(FormattableString.Invariant($"v {p.X:R} {p.Y:R} {p.Z:R}"));
             }
             for(int i=0;i<count;i++)
             {
-                var uv=hasUv?mesh.TextureCoordinates![i]:Vector2.Zero;
+                Vector2 uv=hasUv?mesh.TextureCoordinates![i]:Vector2.Zero;
                 w.WriteLine(FormattableString.Invariant($"vt {uv.X:R} {uv.Y:R}"));
             }
             for(int i=0;i<count;i++)
             {
-                var n=hasNormals?Vector3.TransformNormal(mesh.Normals![i],world):Vector3.UnitY;
-                if(n.LengthSquared()>1e-12f)n.Normalize();else n=Vector3.UnitY;
+                Vector3 n=hasNormals?Vector3.TransformNormal(mesh.Normals![i],world):Vector3.UnitY;
+                n=n.LengthSquared()>1e-12f?Vector3.Normalize(n):Vector3.UnitY;
                 w.WriteLine(FormattableString.Invariant($"vn {n.X:R} {n.Y:R} {n.Z:R}"));
             }
             for(int i=0;i+2<mesh.Indices!.Count;i+=3)
@@ -103,4 +103,4 @@ public sealed class OfficialMxBikesPreviewModelService : IGearPreviewModelServic
     private static string ComputeSha256(string p){using var s=File.OpenRead(p);return Convert.ToHexString(SHA256.HashData(s)).ToLowerInvariant();}
 }
 '@ | Set-Content -LiteralPath $path -Encoding utf8
-Write-Host 'Patched PiBoSo viewer cache writer.'
+Write-Host 'Patched PiBoSo viewer cache writer with Helix v3 public types.'
