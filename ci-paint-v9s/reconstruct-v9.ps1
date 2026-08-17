@@ -25,7 +25,11 @@ $z9=Join-Path $env:RUNNER_TEMP 'v9.zip';[IO.File]::WriteAllBytes($z9,[Convert]::
 $h=(Get-FileHash $z9 -Algorithm SHA256).Hash.ToLowerInvariant();if($h -ne 'dddc9fe4c6152953d318ec9b898c6b02b95c12ff0d9d50e6182eb524d8f4f6f5'){throw "v9 patch hash mismatch: $h"};Expand-Archive $z9 $src -Force
 $moduleRoot=Join-Path $src 'src\MXBRaceDayLive.PaintCreator'
 foreach($rel in @('Services\RiderGearSetStore.cs','Monetization\ProjectFingerprintService.cs','Services\ObjUvMeshLoader.cs','Services\IGearPreviewModelService.cs','Services\OfficialMxBikesPreviewModelService.cs','Services\OfficialMxBikesToolchainService.cs','PaintCreatorModuleEntry.cs')){EnsureUsing (Join-Path $moduleRoot $rel) 'using System.IO;'}
-EnsureUsing (Join-Path $moduleRoot 'Services\OfficialMxBikesToolchainService.cs') 'using System.Net.Http;'
+$toolchain=Join-Path $moduleRoot 'Services\OfficialMxBikesToolchainService.cs'
+EnsureUsing $toolchain 'using System.Net.Http;'
+$tt=Get-Content -Raw $toolchain
+$tt=$tt.Replace('https://www.mx-bikes.com/downloads/painted.zip','https://www.kartracing-pro.com/downloads/painted.zip')
+Set-Content $toolchain $tt -Encoding utf8
 $adapter=Join-Path $moduleRoot 'HostEntitlementAdapter.cs';$at=Get-Content -Raw $adapter;$at=$at.Replace('r.DesignName','r.ProjectName');Set-Content $adapter $at -Encoding utf8
 $demoRoot=Join-Path $src 'src\MXBRaceDayLive.PaintCreator.Demo'
 EnsureUsing (Join-Path $demoRoot 'PaintCreatorHotUpdateService.cs') 'using System.Net.Http;';EnsureUsing (Join-Path $demoRoot 'PaintCreatorHotUpdateService.cs') 'using System.IO;';EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleLoadContext.cs') 'using System.IO;';EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleSession.cs') 'using System.IO;';EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleSession.cs') 'using System.Threading;';EnsureUsing (Join-Path $demoRoot 'MainWindow.xaml.cs') 'using System.IO;'
