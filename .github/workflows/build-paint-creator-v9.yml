@@ -1,0 +1,226 @@
+name: Build Paint Creator v9 PiBoSo Official Toolchain
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths:
+      - 'ci-paint-v9/**'
+      - '.github/workflows/build-paint-creator-v9.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Reconstruct v9 source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          function Raw([string]$p){ ((Get-Content -Raw $p) -replace '\s','') }
+          function EnsureUsing([string]$file,[string]$usingLine){
+            $t=Get-Content -Raw -LiteralPath $file
+            if($t -notmatch [regex]::Escape($usingLine)){
+              Set-Content -LiteralPath $file -Value ($usingLine+"`r`n"+$t) -Encoding utf8
+            }
+          }
+          $p01=(Raw 'ci-paint-v4-repair/p01_0.txt')+(Raw 'ci-paint-v4-repair/p01_1.txt')+(Raw 'ci-paint-v4-repair/p01_2.txt')
+          $p06=(Raw 'ci-paint-v4-repair/p06_0.txt')+(Raw 'ci-paint-v4-repair/p06_1.txt')+(Raw 'ci-paint-v4-repair/p06_2.txt')
+          $p09=(Raw 'ci-paint-v4-repair/p09s_0.txt')+(Raw 'ci-paint-v4-repair/p09s_1.txt')+(Raw 'ci-paint-v4-repair/p09s_2.txt')+(Raw 'ci-paint-v4-repair/p09s_3.txt')+(Raw 'ci-paint-v4-repair/p09s_4.txt')
+          $p10=(Raw 'ci-paint-v4-repair/p10s_0.txt')+(Raw 'ci-paint-v4-repair/p10s_1.txt')+(Raw 'ci-paint-v4-repair/p10s_2.txt')+(Raw 'ci-paint-v4-repair/p10s_3.txt')+(Raw 'ci-paint-v4-repair/p10s_4.txt')
+          $b=$p01
+          foreach($n in 2..5){$b+=Raw ("ci-paint-v4/part{0:D2}.txt" -f $n)}
+          $b+=$p06
+          foreach($n in 7..8){$b+=Raw ("ci-paint-v4/part{0:D2}.txt" -f $n)}
+          $b+=$p09+$p10
+          $z=Join-Path $env:RUNNER_TEMP 'v4.zip'
+          [IO.File]::WriteAllBytes($z,[Convert]::FromBase64String($b))
+          if((Get-FileHash $z -Algorithm SHA256).Hash.ToLowerInvariant() -ne '4d4a4e2c81b4210530d1993da89a859ea02f3c4eb870748de3ef85dabd1bd7c9'){throw 'v4 hash mismatch'}
+          $src=Join-Path $env:RUNNER_TEMP 'v9src'
+          Expand-Archive $z $src -Force
+
+          $z5=Join-Path $env:RUNNER_TEMP 'v5.zip'
+          [IO.File]::WriteAllBytes($z5,[Convert]::FromBase64String((Raw 'ci-paint-v5/paint-v5-patch.zip.b64')))
+          Expand-Archive $z5 $src -Force
+
+          $v6='';foreach($n in 0..5){$v6+=Raw ("ci-paint-v6-clean/part{0:D2}.txt" -f $n)}
+          $z6=Join-Path $env:RUNNER_TEMP 'v6.zip';[IO.File]::WriteAllBytes($z6,[Convert]::FromBase64String($v6));Expand-Archive $z6 $src -Force
+          $v7='';foreach($n in 0..3){$v7+=Raw ("ci-paint-v7/part{0:D2}.txt" -f $n)}
+          $z7=Join-Path $env:RUNNER_TEMP 'v7.zip';[IO.File]::WriteAllBytes($z7,[Convert]::FromBase64String($v7));Expand-Archive $z7 $src -Force
+          $v8='';foreach($n in 0..3){$v8+=Raw ("ci-paint-v8/part{0:D2}.txt" -f $n)}
+          $z8=Join-Path $env:RUNNER_TEMP 'v8.zip';[IO.File]::WriteAllBytes($z8,[Convert]::FromBase64String($v8));Expand-Archive $z8 $src -Force
+
+          $v9='';foreach($n in 0..3){$v9+=Raw ("ci-paint-v9/part{0:D2}.txt" -f $n)}
+          $z9=Join-Path $env:RUNNER_TEMP 'v9.zip';[IO.File]::WriteAllBytes($z9,[Convert]::FromBase64String($v9))
+          $h=(Get-FileHash $z9 -Algorithm SHA256).Hash.ToLowerInvariant()
+          if($h -ne 'dddc9fe4c6152953d318ec9b898c6b02b95c12ff0d9d50e6182eb524d8f4f6f5'){throw "v9 patch hash mismatch: $h"}
+          Expand-Archive $z9 $src -Force
+
+          $moduleRoot=Join-Path $src 'src\MXBRaceDayLive.PaintCreator'
+          foreach($rel in @(
+            'Services\RiderGearSetStore.cs',
+            'Monetization\ProjectFingerprintService.cs',
+            'Services\ObjUvMeshLoader.cs',
+            'Services\IGearPreviewModelService.cs',
+            'Services\OfficialMxBikesPreviewModelService.cs',
+            'Services\OfficialMxBikesToolchainService.cs',
+            'PaintCreatorModuleEntry.cs')){
+            EnsureUsing (Join-Path $moduleRoot $rel) 'using System.IO;'
+          }
+          EnsureUsing (Join-Path $moduleRoot 'Services\OfficialMxBikesToolchainService.cs') 'using System.Net.Http;'
+          $adapter=Join-Path $moduleRoot 'HostEntitlementAdapter.cs'
+          $at=Get-Content -Raw $adapter;$at=$at.Replace('r.DesignName','r.ProjectName');Set-Content $adapter $at -Encoding utf8
+
+          $demoRoot=Join-Path $src 'src\MXBRaceDayLive.PaintCreator.Demo'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorHotUpdateService.cs') 'using System.Net.Http;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorHotUpdateService.cs') 'using System.IO;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleLoadContext.cs') 'using System.IO;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleSession.cs') 'using System.IO;'
+          EnsureUsing (Join-Path $demoRoot 'PaintCreatorModuleSession.cs') 'using System.Threading;'
+          EnsureUsing (Join-Path $demoRoot 'MainWindow.xaml.cs') 'using System.IO;'
+          "SRC=$src" >> $env:GITHUB_ENV
+
+      - name: Validate PiBoSo official source wiring
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator'
+          $all=(Get-ChildItem $root -Recurse -File -Include *.cs,*.xaml,*.csproj | ForEach-Object { Get-Content -Raw $_.FullName }) -join "`n"
+          foreach($needle in @('rider.psd','mxb_rider_template.FBX','painted.zip','AuthoritativeTemplatePsdPath','PIBOSO RIDER.PSD','Magick.NET-Q8-AnyCPU')){
+            if(!$all.Contains($needle)){throw "missing PiBoSo integration requirement: $needle"}
+          }
+
+      - name: Compile and publish v9 module
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $proj=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
+          dotnet build $proj -c Release
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          $module=Join-Path $env:RUNNER_TEMP 'module-v9'
+          dotnet publish $proj -c Release -r win-x64 --self-contained false -o $module
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+          if(!(Test-Path (Join-Path $module 'MXBRaceDayLive.PaintCreator.dll'))){throw 'v9 module missing'}
+          "MODULE=$module" >> $env:GITHUB_ENV
+
+      - name: Official PiBoSo PSD FBX PaintEd smoke test
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $test=Join-Path $env:RUNNER_TEMP 'v9-toolchain';New-Item -ItemType Directory -Force $test|Out-Null
+          $lib=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
+          @"
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+            <ItemGroup><ProjectReference Include="$lib" /></ItemGroup>
+          </Project>
+          "@ | Set-Content (Join-Path $test 'Toolchain.csproj')
+          @'
+          using System.IO;
+          using MXBRaceDayLive.PaintCreator.Models;
+          using MXBRaceDayLive.PaintCreator.Services;
+          var root=Path.Combine(Path.GetTempPath(),"mxb-v9-official-"+Guid.NewGuid().ToString("N"));
+          Directory.CreateDirectory(root);
+          var ctx=new PaintCreatorContext{ProjectRoot=root};
+          var tools=new OfficialMxBikesToolchainService();
+          var template=await tools.EnsurePaintTemplateAsync(PaintTargetType.Rider,ctx);
+          if(!File.Exists(template.PsdPath)||!string.Equals(Path.GetFileName(template.PsdPath),"rider.psd",StringComparison.OrdinalIgnoreCase))throw new Exception("official rider.psd missing");
+          if(!File.Exists(template.PreviewPngPath)||template.Width<512||template.Height<512)throw new Exception("rider.psd preview failed");
+          var fbx=await tools.EnsureRiderFbxAsync(ctx);
+          if(!File.Exists(fbx)||!string.Equals(Path.GetFileName(fbx),"mxb_rider_template.FBX",StringComparison.OrdinalIgnoreCase))throw new Exception("official rider FBX missing");
+          var painted=await tools.EnsurePaintEdAsync(ctx);
+          if(!File.Exists(painted)||!string.Equals(Path.GetFileName(painted),"painted.exe",StringComparison.OrdinalIgnoreCase))throw new Exception("official PaintEd missing");
+          Console.WriteLine($"PSD={Path.GetFileName(template.PsdPath)} SIZE={template.Width}x{template.Height}");
+          Console.WriteLine($"FBX={Path.GetFileName(fbx)}");
+          Console.WriteLine($"PAINTED={Path.GetFileName(painted)}");
+          '@ | Set-Content (Join-Path $test 'Program.cs')
+          dotnet run --project (Join-Path $test 'Toolchain.csproj') -c Release | Tee-Object (Join-Path $env:RUNNER_TEMP 'V9_OFFICIAL_TOOLCHAIN_TEST.txt')
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+
+      - name: Real PiBoSo rider UV viewer regression
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $s=Join-Path $env:RUNNER_TEMP 'v9-viewer';New-Item -ItemType Directory -Force $s|Out-Null
+          $lib=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
+          @"
+          <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><ProjectReference Include="$lib"/></ItemGroup></Project>
+          "@ | Set-Content (Join-Path $s 'Viewer.csproj')
+          @'
+          using System.IO;
+          using MXBRaceDayLive.PaintCreator.Models;
+          using MXBRaceDayLive.PaintCreator.Services;
+          var root=Path.Combine(Path.GetTempPath(),"mxb-v9-viewer-"+Guid.NewGuid().ToString("N"));Directory.CreateDirectory(root);
+          var r=await new OfficialMxBikesPreviewModelService().ResolveAsync(PaintTargetType.Rider,new PaintCreatorContext{ProjectRoot=root});
+          if(!r.Ready||string.IsNullOrWhiteSpace(r.ObjPath))throw new Exception("rider model failed: "+r.Status);
+          var m=ObjUvMeshLoader.Load(r.ObjPath);
+          Console.WriteLine($"POSITIONS={m.Positions.Count} TRIANGLES={m.TriangleIndices.Count/3} UVS={m.TextureCoordinates.Count} STATUS={r.Status}");
+          if(m.Positions.Count<100||m.TriangleIndices.Count<300||m.TextureCoordinates.Count!=m.Positions.Count)throw new Exception("bad official rider UV mesh");
+          '@ | Set-Content (Join-Path $s 'Program.cs')
+          dotnet run --project (Join-Path $s 'Viewer.csproj') -c Release | Tee-Object (Join-Path $env:RUNNER_TEMP 'V9_VIEWER_TEST.txt')
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+
+      - name: Hot swap v9 through existing updater host
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $test=Join-Path $env:RUNNER_TEMP 'v9-hotswap';New-Item -ItemType Directory -Force $test|Out-Null
+          $contracts=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Contracts\MXBRaceDayLive.PaintCreator.Contracts.csproj'
+          $demo=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator.Demo\MXBRaceDayLive.PaintCreator.Demo.csproj'
+          @"
+          <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup><ItemGroup><ProjectReference Include="$contracts"/><ProjectReference Include="$demo"/></ItemGroup></Project>
+          "@ | Set-Content (Join-Path $test 'HotSwap.csproj')
+          @'
+          using System.IO;
+          using MXBRaceDayLive.PaintCreator.Contracts;
+          using MXBRaceDayLive.PaintCreator.Demo;
+          internal sealed class Services:IPaintCreatorHostServices{
+            public Task<HostPaintOffer> GetExportOfferAsync(HostPaintExportRequest r,CancellationToken c=default)=>Task.FromResult(new HostPaintOffer(r.ProductId,"TEST",1m,"USD"));
+            public Task<HostPaintAuthorization> CheckExportAsync(HostPaintExportRequest r,CancellationToken c=default)=>Task.FromResult(new HostPaintAuthorization(true,"OK"));
+            public Task<HostPaintAuthorization> PurchaseExportAsync(HostPaintExportRequest r,CancellationToken c=default)=>Task.FromResult(new HostPaintAuthorization(true,"OK"));
+          }
+          internal static class Program{[STAThread]static void Main(){
+            var app=new System.Windows.Application();
+            var dir=Environment.GetEnvironmentVariable("MODULE")!;
+            var root=Path.Combine(Path.GetTempPath(),"mxb-v9-state-"+Guid.NewGuid().ToString("N"));
+            var s=PaintCreatorModuleSession.Load(dir,new PaintCreatorHostOptions(root,"ci"),new Services());
+            if(s.Module.View==null)throw new Exception("view missing");
+            var state=s.Module.CaptureState();
+            if(!s.Module.ModuleVersion.StartsWith("9.0.0"))throw new Exception("wrong version "+s.Module.ModuleVersion);
+            s.Module.RestoreState(state);
+            Console.WriteLine("HOT_SWAP_READY VERSION="+s.Module.ModuleVersion+" STATE="+state.Length);
+            s.Dispose();
+          }}
+          '@ | Set-Content (Join-Path $test 'Program.cs')
+          dotnet run --project (Join-Path $test 'HotSwap.csproj') -c Release | Tee-Object (Join-Path $env:RUNNER_TEMP 'V9_HOT_SWAP_TEST.txt')
+          if($LASTEXITCODE){exit $LASTEXITCODE}
+
+      - name: Publish v9 in app update feed
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $releaseDir='paint-creator/releases';New-Item -ItemType Directory -Force $releaseDir|Out-Null
+          $zip=Join-Path $releaseDir 'MXB_Race_Day_Live_Paint_Creator_Module_v9_0_0.zip'
+          if(Test-Path $zip){Remove-Item $zip -Force}
+          Compress-Archive -Path (Join-Path $env:MODULE '*') -DestinationPath $zip -Force
+          $sha=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          [ordered]@{
+            version='9.0.0';
+            url='https://api.github.com/repos/n286f7kh2k-debug/MXB-Bike-Builder/contents/paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v9_0_0.zip?ref=build%2Frace-day-live-paint-creator';
+            sha256=$sha;
+            notes='v9 PiBoSo official toolchain: uses rider.psd from templates.zip, mxb_rider_template.FBX from mxb_rider_templates.zip, auto-acquires official PaintEd, preserves exact UV placement, projects, and in-app hot updating.'
+          } | ConvertTo-Json | Set-Content 'paint-creator/latest.json' -Encoding utf8
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add paint-creator
+          git commit -m 'Publish Paint Creator v9 PiBoSo official toolchain [skip ci]'
+          git push origin HEAD:build/race-day-live-paint-creator
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paint-Creator-v9-PIBOSO-OFFICIAL-HOT-MODULE
+          path: |
+            paint-creator/latest.json
+            paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v9_0_0.zip
+          retention-days: 7
