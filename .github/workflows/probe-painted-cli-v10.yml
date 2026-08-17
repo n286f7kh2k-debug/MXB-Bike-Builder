@@ -1,0 +1,42 @@
+name: Probe PiBoSo PaintEd CLI
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths: ['.github/workflows/probe-painted-cli-v10.yml']
+  workflow_dispatch:
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download official PaintEd and test CLI pack extract
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP 'painted-cli';New-Item -ItemType Directory -Force $root|Out-Null
+          $zip=Join-Path $root 'painted.zip'
+          Invoke-WebRequest 'https://www.kartracing-pro.com/downloads/painted.zip' -OutFile $zip -UseBasicParsing
+          Expand-Archive $zip (Join-Path $root 'tool') -Force
+          $exe=(Get-ChildItem (Join-Path $root 'tool') -Filter painted.exe -Recurse|Select-Object -First 1).FullName
+          Write-Host "PAINTED=$exe"
+          Write-Host "PAINTED_SHA256=$((Get-FileHash $exe -Algorithm SHA256).Hash.ToLowerInvariant())"
+          & $exe 2>&1 | ForEach-Object { Write-Host "USAGE: $_" }
+          $paintDir=Join-Path $root 'paint';New-Item -ItemType Directory -Force $paintDir|Out-Null
+          # Write a tiny valid uncompressed 24-bit TGA named exactly as MX Bikes expects for rider paints.
+          $tga=New-Object byte[] (18+4*4*3)
+          $tga[2]=2;$tga[12]=4;$tga[14]=4;$tga[16]=24;$tga[17]=32
+          for($i=18;$i -lt $tga.Length;$i+=3){$tga[$i]=40;$tga[$i+1]=120;$tga[$i+2]=220}
+          [IO.File]::WriteAllBytes((Join-Path $paintDir 'rider.tga'),$tga)
+          $out=Join-Path $root 'cli_test.pnt'
+          Push-Location $root
+          try { & $exe c $paintDir $out 'Race Day Live CLI Test'; $code=$LASTEXITCODE } finally { Pop-Location }
+          Write-Host "CREATE_EXIT=$code"
+          if(!(Test-Path $out)){throw 'PaintEd CLI did not create PNT'}
+          Write-Host "PNT_SIZE=$((Get-Item $out).Length)"
+          Write-Host "PNT_SHA256=$((Get-FileHash $out -Algorithm SHA256).Hash.ToLowerInvariant())"
+          $extract=Join-Path $root 'extract';New-Item -ItemType Directory -Force $extract|Out-Null
+          Push-Location $root
+          try { & $exe e $out $extract; $ecode=$LASTEXITCODE } finally { Pop-Location }
+          Write-Host "EXTRACT_EXIT=$ecode"
+          Get-ChildItem $extract -Recurse|ForEach-Object{Write-Host "EXTRACTED=$($_.FullName) SIZE=$($_.Length)"}
+          if(!(Get-ChildItem $extract -Filter rider.tga -Recurse)){throw 'PaintEd CLI extract did not recover rider.tga'}
