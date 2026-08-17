@@ -1,0 +1,55 @@
+name: Build Paint Creator v11 Exact PiBoSo PSD Zones
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths:
+      - 'ci-paint-v11/**'
+      - '.github/workflows/build-paint-creator-v11.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct verified v9 source
+        shell: pwsh
+        run: .\ci-paint-v9s\reconstruct-v9.ps1
+      - name: Apply verified PiBoSo rider viewer
+        shell: pwsh
+        run: .\ci-paint-v9s\patch-viewer-v9.ps1
+      - name: Apply verified v10 automatic PNT install
+        shell: pwsh
+        run: .\ci-paint-v10\apply-v10.ps1
+      - name: Apply verified v11 PSD zone patch
+        shell: pwsh
+        run: .\ci-paint-v11\apply-v11.ps1
+      - name: Compile v11 module
+        shell: pwsh
+        run: .\ci-paint-v11\compile-v11.ps1
+      - name: Test official PiBoSo PSD FBX PaintEd
+        shell: pwsh
+        run: .\ci-paint-v9s\test-toolchain-v9.ps1
+      - name: Test exact Rider and Gloves PSD color zones
+        shell: pwsh
+        run: .\ci-paint-v11\test-psd-zones-v11.ps1
+      - name: Test official rider UV viewer
+        shell: pwsh
+        run: .\ci-paint-v9s\test-viewer-v9.ps1
+      - name: Re-test PaintEd PNT pack and MX Bikes install
+        shell: pwsh
+        run: .\ci-paint-v10\test-packinstall-v10.ps1
+      - name: Test in-app hot swap
+        shell: pwsh
+        run: .\ci-paint-v11\test-hotswap-v11.ps1
+      - name: Publish v11 in-app feed
+        shell: pwsh
+        run: .\ci-paint-v11\publish-v11.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paint-Creator-v11-PIBOSO-PSD-ZONES-AUTO-PNT-HOT-MODULE
+          path: |
+            paint-creator/latest.json
+            paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v11_0_0.zip
+          retention-days: 7
