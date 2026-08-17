@@ -1,0 +1,4 @@
+{
+  "version": "2.3.0",
+  "release_notes": "Fix automatic in-app updates: permanent Bike Forge update channel, no blank/editable update feed, cache-busted manifest and EXE downloads, relative manifest URL support, SHA-256 verification, and automatic helper replacement/relaunch with no manual close or reopen. Includes the v2.2 UI-freeze fixes and Blender-backed bike creation pipeline."
+}
