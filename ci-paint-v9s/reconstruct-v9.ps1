@@ -20,7 +20,8 @@ $z5=Join-Path $env:RUNNER_TEMP 'v5.zip';[IO.File]::WriteAllBytes($z5,[Convert]::
 $v6='';foreach($n in 0..5){$v6+=Raw ("ci-paint-v6-clean/part{0:D2}.txt" -f $n)};$z6=Join-Path $env:RUNNER_TEMP 'v6.zip';[IO.File]::WriteAllBytes($z6,[Convert]::FromBase64String($v6));Expand-Archive $z6 $src -Force
 $v7='';foreach($n in 0..3){$v7+=Raw ("ci-paint-v7/part{0:D2}.txt" -f $n)};$z7=Join-Path $env:RUNNER_TEMP 'v7.zip';[IO.File]::WriteAllBytes($z7,[Convert]::FromBase64String($v7));Expand-Archive $z7 $src -Force
 $v8='';foreach($n in 0..3){$v8+=Raw ("ci-paint-v8/part{0:D2}.txt" -f $n)};$z8=Join-Path $env:RUNNER_TEMP 'v8.zip';[IO.File]::WriteAllBytes($z8,[Convert]::FromBase64String($v8));Expand-Archive $z8 $src -Force
-$v9='';foreach($n in 0..7){$v9+=Raw ("ci-paint-v9s/part{0:D2}.txt" -f $n)};$z9=Join-Path $env:RUNNER_TEMP 'v9.zip';[IO.File]::WriteAllBytes($z9,[Convert]::FromBase64String($v9))
+$v9=(Raw 'ci-paint-v9s/part00.txt')+(Raw 'ci-paint-v9s/part01.txt')+(Raw 'ci-paint-v9/part01.txt')+(Raw 'ci-paint-v9s/part04.txt')+(Raw 'ci-paint-v9s/part05.txt')+(Raw 'ci-paint-v9s/part06.txt')+(Raw 'ci-paint-v9s/part07.txt')
+$z9=Join-Path $env:RUNNER_TEMP 'v9.zip';[IO.File]::WriteAllBytes($z9,[Convert]::FromBase64String($v9))
 $h=(Get-FileHash $z9 -Algorithm SHA256).Hash.ToLowerInvariant();if($h -ne 'dddc9fe4c6152953d318ec9b898c6b02b95c12ff0d9d50e6182eb524d8f4f6f5'){throw "v9 patch hash mismatch: $h"};Expand-Archive $z9 $src -Force
 $moduleRoot=Join-Path $src 'src\MXBRaceDayLive.PaintCreator'
 foreach($rel in @('Services\RiderGearSetStore.cs','Monetization\ProjectFingerprintService.cs','Services\ObjUvMeshLoader.cs','Services\IGearPreviewModelService.cs','Services\OfficialMxBikesPreviewModelService.cs','Services\OfficialMxBikesToolchainService.cs','PaintCreatorModuleEntry.cs')){EnsureUsing (Join-Path $moduleRoot $rel) 'using System.IO;'}
