@@ -1,0 +1,22 @@
+name: Export Paint Creator v10 source
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths: ['.github/workflows/export-paint-v10-source.yml']
+jobs:
+  export:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct v10 source
+        shell: pwsh
+        run: |
+          .\ci-paint-v9s\reconstruct-v9.ps1
+          .\ci-paint-v9s\patch-viewer-v9.ps1
+          .\ci-paint-v10\apply-v10.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paint-Creator-v10-SOURCE
+          path: ${{ env.SRC }}
+          retention-days: 2
