@@ -1,0 +1,25 @@
+name: Verify PiBoSo template hashes
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths: ['.github/workflows/verify-piboso-template-hashes.yml']
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hash official templates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP 'piboso-hash';New-Item -ItemType Directory -Force $root|Out-Null
+          Invoke-WebRequest 'https://www.mx-bikes.com/downloads/templates.zip' -OutFile (Join-Path $root 'templates.zip')
+          Expand-Archive (Join-Path $root 'templates.zip') (Join-Path $root 'files') -Force
+          foreach($name in @('rider.psd','gloves.psd')){
+            $f=(Get-ChildItem (Join-Path $root 'files') -Recurse -Filter $name|Select-Object -First 1).FullName
+            if(!$f){throw "$name missing"}
+            $h=(Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant()
+            $len=(Get-Item $f).Length
+            Write-Host "$name SHA256=$h SIZE=$len"
+          }
