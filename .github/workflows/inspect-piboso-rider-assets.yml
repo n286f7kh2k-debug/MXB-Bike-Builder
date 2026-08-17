@@ -1,0 +1,31 @@
+name: Inspect PiBoSo Rider Assets
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths:
+      - '.github/workflows/inspect-piboso-rider-assets.yml'
+  workflow_dispatch:
+jobs:
+  inspect:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and inspect official MX Bikes packages
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP 'piboso-assets'
+          New-Item -ItemType Directory -Force $root | Out-Null
+          $templates=Join-Path $root 'templates.zip'
+          $rider=Join-Path $root 'mxb_rider_templates.zip'
+          Invoke-WebRequest -Uri 'https://www.mx-bikes.com/downloads/templates.zip' -OutFile $templates
+          Invoke-WebRequest -Uri 'https://www.mx-bikes.com/downloads/mxb_rider_templates.zip' -OutFile $rider
+          Write-Host "templates.zip SHA256=$((Get-FileHash $templates -Algorithm SHA256).Hash)"
+          Write-Host "mxb_rider_templates.zip SHA256=$((Get-FileHash $rider -Algorithm SHA256).Hash)"
+          $td=Join-Path $root 'templates'; $rd=Join-Path $root 'rider-model'
+          Expand-Archive $templates $td -Force
+          Expand-Archive $rider $rd -Force
+          Write-Host '=== OFFICIAL TEMPLATE FILES MATCHING RIDER / PSD / FBX ==='
+          Get-ChildItem $td -Recurse -File | Where-Object { $_.Name -match 'rider|\.psd$|\.fbx$|helmet|gloves|boots' } | ForEach-Object { $_.FullName.Substring($td.Length+1) }
+          Write-Host '=== OFFICIAL RIDER MODEL PACKAGE FILES ==='
+          Get-ChildItem $rd -Recurse -File | ForEach-Object { $_.FullName.Substring($rd.Length+1) }
