@@ -1,0 +1,46 @@
+name: Probe HelixToolkit 3.1.2 Rider Geometry
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths:
+      - '.github/workflows/probe-helix-v9.yml'
+      - 'ci-helix-probe/**'
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe exact Helix 3.1.2 API and PiBoSo rider scene
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $d=Join-Path $env:RUNNER_TEMP 'helix-probe';New-Item -ItemType Directory -Force $d|Out-Null
+          @'
+          <Project Sdk="Microsoft.NET.Sdk">
+            <PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable></PropertyGroup>
+            <ItemGroup><PackageReference Include="HelixToolkit.SharpDX.Assimp" Version="3.1.2" /></ItemGroup>
+          </Project>
+          '@|Set-Content (Join-Path $d 'Probe.csproj')
+          @'
+          using HelixToolkit.SharpDX.Assimp;
+          using HelixToolkit.SharpDX.Model.Scene;
+          using System.IO.Compression;
+          using System.Reflection;
+          var zip=Path.Combine(Path.GetTempPath(),"mxb_rider_templates.zip");
+          using(var h=new HttpClient()){var b=await h.GetByteArrayAsync("https://www.mx-bikes.com/downloads/mxb_rider_templates.zip");await File.WriteAllBytesAsync(zip,b);}
+          var root=Path.Combine(Path.GetTempPath(),"mxb-rider-probe");Directory.CreateDirectory(root);ZipFile.ExtractToDirectory(zip,root,true);
+          var fbx=Directory.GetFiles(root,"mxb_rider_template.FBX",SearchOption.AllDirectories).Single();
+          Console.WriteLine("GeometryNode.Geometry declared type="+typeof(GeometryNode).GetProperty("Geometry")?.PropertyType.AssemblyQualifiedName);
+          using var importer=new Importer();var scene=importer.Load(fbx)??throw new Exception("import failed");
+          Console.WriteLine("ROOT="+scene.Root.GetType().AssemblyQualifiedName);
+          foreach(var n in importer.SceneNodes){
+            if(n is not GeometryNode g||g.Geometry==null)continue;
+            var t=g.Geometry.GetType();Console.WriteLine("NODE="+n.Name+" GEOM="+t.AssemblyQualifiedName);
+            foreach(var p in t.GetProperties(BindingFlags.Public|BindingFlags.Instance).Where(p=>new[]{"Positions","Indices","TriangleIndices","TextureCoordinates","Normals"}.Contains(p.Name))) {
+              object? v=null;try{v=p.GetValue(g.Geometry);}catch{}
+              var count=v?.GetType().GetProperty("Count")?.GetValue(v);
+              Console.WriteLine("  PROP "+p.Name+" TYPE="+p.PropertyType.AssemblyQualifiedName+" COUNT="+count);
+            }
+          }
+          '@|Set-Content (Join-Path $d 'Program.cs')
+          dotnet run --project (Join-Path $d 'Probe.csproj') -c Release
