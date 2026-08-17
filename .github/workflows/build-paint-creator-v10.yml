@@ -1,0 +1,49 @@
+name: Build Paint Creator v10 Automatic PNT Install
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths:
+      - 'ci-paint-v10/**'
+      - '.github/workflows/build-paint-creator-v10.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct verified v9 source
+        shell: pwsh
+        run: .\ci-paint-v9s\reconstruct-v9.ps1
+      - name: Apply verified PiBoSo rider viewer
+        shell: pwsh
+        run: .\ci-paint-v9s\patch-viewer-v9.ps1
+      - name: Apply verified v10 patch
+        shell: pwsh
+        run: .\ci-paint-v10\apply-v10.ps1
+      - name: Compile v10 module
+        shell: pwsh
+        run: .\ci-paint-v10\compile-v10.ps1
+      - name: Test official PiBoSo PSD FBX PaintEd
+        shell: pwsh
+        run: .\ci-paint-v9s\test-toolchain-v9.ps1
+      - name: Test official rider UV viewer
+        shell: pwsh
+        run: .\ci-paint-v9s\test-viewer-v9.ps1
+      - name: Test PaintEd PNT pack and MX Bikes install
+        shell: pwsh
+        run: .\ci-paint-v10\test-packinstall-v10.ps1
+      - name: Test in-app hot swap
+        shell: pwsh
+        run: .\ci-paint-v10\test-hotswap-v10.ps1
+      - name: Publish v10 in-app feed
+        shell: pwsh
+        run: .\ci-paint-v10\publish-v10.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paint-Creator-v10-PIBOSO-AUTO-PNT-HOT-MODULE
+          path: |
+            paint-creator/latest.json
+            paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v10_0_0.zip
+          retention-days: 7
