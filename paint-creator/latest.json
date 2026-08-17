@@ -1,6 +1,6 @@
 {
   "version": "9.0.0",
   "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/build/race-day-live-paint-creator/paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v9_0_0.zip",
-  "sha256": "e55500b6df7fe6039f8d188592a6f77253401bc74743c4b4a2468bd74cbe794f",
+  "sha256": "6ff8670700fe17920912e7f72798c89ebe49d7d7087ad291aa735920d09ab321",
   "notes": "v9 PiBoSo official toolchain: official mxb_rider_template.FBX 3D UV viewer, rider/glove PSD template profiles, PaintEd integration, preserved UV placement/projects, and in-app hot updating."
 }
