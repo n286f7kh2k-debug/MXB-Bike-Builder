@@ -1,7 +1,7 @@
 $ErrorActionPreference='Stop'
 $path=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\Services\OfficialMxBikesPreviewModelService.cs'
 @'
-using HelixToolkit.Geometry;
+using HelixToolkit.SharpDX;
 using HelixToolkit.SharpDX.Assimp;
 using HelixToolkit.SharpDX.Model.Scene;
 using MXBRaceDayLive.PaintCreator.Models;
@@ -60,7 +60,7 @@ public sealed class OfficialMxBikesPreviewModelService : IGearPreviewModelServic
         void Walk(SceneNode node,Matrix4x4 parentWorld)
         {
             Matrix4x4 world=node.ModelMatrix*parentWorld;
-            if(node is GeometryNode geo && geo.Geometry is MeshGeometry3D mesh && mesh.Positions is {Count:>0} && mesh.Indices is {Count:>2}) WriteMesh(mesh,world,node.Name);
+            if(node is GeometryNode geo && geo.Geometry is MeshGeometry3D mesh && mesh.Positions is {Count:>0} && mesh.TriangleIndices is {Count:>2}) WriteMesh(mesh,world,node.Name);
             if(node is GroupNodeBase group) foreach(var child in group.Items) Walk(child,world);
         }
 
@@ -86,9 +86,10 @@ public sealed class OfficialMxBikesPreviewModelService : IGearPreviewModelServic
                 n=n.LengthSquared()>1e-12f?Vector3.Normalize(n):Vector3.UnitY;
                 w.WriteLine(FormattableString.Invariant($"vn {n.X:R} {n.Y:R} {n.Z:R}"));
             }
-            for(int i=0;i+2<mesh.Indices!.Count;i+=3)
+            var indices=mesh.TriangleIndices!;
+            for(int i=0;i+2<indices.Count;i+=3)
             {
-                int a=vertexBase+mesh.Indices[i],b=vertexBase+mesh.Indices[i+1],c=vertexBase+mesh.Indices[i+2];
+                int a=vertexBase+indices[i],b=vertexBase+indices[i+1],c=vertexBase+indices[i+2];
                 w.WriteLine($"f {a}/{a}/{a} {b}/{b}/{b} {c}/{c}/{c}");triangleCount++;
             }
             vertexBase+=count;meshCount++;
@@ -103,4 +104,4 @@ public sealed class OfficialMxBikesPreviewModelService : IGearPreviewModelServic
     private static string ComputeSha256(string p){using var s=File.OpenRead(p);return Convert.ToHexString(SHA256.HashData(s)).ToLowerInvariant();}
 }
 '@ | Set-Content -LiteralPath $path -Encoding utf8
-Write-Host 'Patched PiBoSo viewer cache writer with Helix v3 public types.'
+Write-Host 'Patched PiBoSo viewer cache writer against exact HelixToolkit.SharpDX 3.1.2 MeshGeometry3D API.'
