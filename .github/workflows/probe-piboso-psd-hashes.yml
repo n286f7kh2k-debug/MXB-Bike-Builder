@@ -1,0 +1,22 @@
+name: Probe PiBoSo PSD Hashes
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths: ['.github/workflows/probe-piboso-psd-hashes.yml']
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Hash current official rider and gloves PSDs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP 'piboso-psds';New-Item -ItemType Directory -Force $root|Out-Null
+          $zip=Join-Path $root 'templates.zip';Invoke-WebRequest 'https://www.mx-bikes.com/downloads/templates.zip' -OutFile $zip -UseBasicParsing;Expand-Archive $zip (Join-Path $root 'x') -Force
+          foreach($name in @('rider.psd','gloves.psd')){
+            $f=Get-ChildItem (Join-Path $root 'x') -Filter $name -Recurse|Select-Object -First 1
+            if(!$f){throw "$name missing"}
+            Write-Host "$($name.ToUpperInvariant())_SIZE=$($f.Length)"
+            Write-Host "$($name.ToUpperInvariant())_SHA256=$((Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant())"
+          }
