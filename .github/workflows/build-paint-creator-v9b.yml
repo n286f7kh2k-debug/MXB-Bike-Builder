@@ -16,6 +16,9 @@ jobs:
       - name: Reconstruct verified v9 source
         shell: pwsh
         run: .\ci-paint-v9s\reconstruct-v9.ps1
+      - name: Apply PiBoSo rider viewer fix
+        shell: pwsh
+        run: .\ci-paint-v9s\patch-viewer-v9.ps1
       - name: Compile v9 module
         shell: pwsh
         run: .\ci-paint-v9s\compile-v9.ps1
