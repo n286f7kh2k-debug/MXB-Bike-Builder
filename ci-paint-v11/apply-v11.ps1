@@ -1,7 +1,14 @@
 $ErrorActionPreference='Stop'
 function Raw([string]$p){ ((Get-Content -Raw -LiteralPath $p) -replace '\s','') }
 $b=''
-foreach($n in 0..8){ $b += Raw ("ci-paint-v11/part{0:D2}.txt" -f $n) }
+$b += Raw 'ci-paint-v11/repair/part00_0.txt'
+$b += Raw 'ci-paint-v11/repair/part00_1.txt'
+$b += Raw 'ci-paint-v11/part01.txt'
+$b += Raw 'ci-paint-v11/part02.txt'
+$b += Raw 'ci-paint-v11/repair/part03_0_0.txt'
+$b += Raw 'ci-paint-v11/repair/part03_0_1.txt'
+$b += Raw 'ci-paint-v11/repair/part03_1.txt'
+foreach($n in 4..8){ $b += Raw ("ci-paint-v11/part{0:D2}.txt" -f $n) }
 $zip=Join-Path $env:RUNNER_TEMP 'paint-v11.zip'
 [IO.File]::WriteAllBytes($zip,[Convert]::FromBase64String($b))
 $sha=(Get-FileHash $zip -Algorithm SHA256).Hash.ToLowerInvariant()
