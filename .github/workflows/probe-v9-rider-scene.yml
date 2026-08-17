@@ -1,0 +1,60 @@
+name: Probe v9 PiBoSo rider scene
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths: ['.github/workflows/probe-v9-rider-scene.yml']
+jobs:
+  probe:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Probe imported scene
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $root=Join-Path $env:RUNNER_TEMP 'probe';New-Item -ItemType Directory -Force $root|Out-Null
+          Invoke-WebRequest 'https://www.mx-bikes.com/downloads/mxb_rider_templates.zip' -OutFile (Join-Path $root 'rider.zip')
+          Expand-Archive (Join-Path $root 'rider.zip') $root -Force
+          $fbx=(Get-ChildItem $root -Recurse -Filter 'mxb_rider_template.FBX' | Select-Object -First 1).FullName
+          if(!$fbx){throw 'FBX missing'}
+          dotnet new console -n Probe -o (Join-Path $root 'app') -f net8.0 --force | Out-Null
+          Push-Location (Join-Path $root 'app')
+          dotnet add package HelixToolkit.SharpDX.Assimp --version 3.1.2 | Out-Null
+          @'
+          using System.Collections;
+          using HelixToolkit.SharpDX.Assimp;
+          var fbx=Environment.GetEnvironmentVariable("FBX")!;
+          using var importer=new Importer();
+          var scene=importer.Load(fbx) ?? throw new Exception("load failed");
+          int nodeNo=0;
+          void Walk(object? node,int depth){
+            if(node==null)return;
+            var t=node.GetType();
+            Console.WriteLine($"NODE {nodeNo++} DEPTH={depth} TYPE={t.FullName}");
+            foreach(var pn in new[]{"Geometry","ModelMatrix","Items","Children"}){
+              var p=t.GetProperty(pn);
+              if(p==null)continue;
+              object? v=null;try{v=p.GetValue(node);}catch{}
+              Console.WriteLine($"  PROP {pn} TYPE={p.PropertyType.FullName} VALUE={(v==null?"null":v.GetType().FullName)}");
+              if(pn=="Geometry" && v!=null){
+                var gt=v.GetType();
+                foreach(var gn in new[]{"Positions","Indices","TriangleIndices","TextureCoordinates","Normals"}){
+                  var gp=gt.GetProperty(gn);if(gp==null)continue;
+                  object? gv=null;try{gv=gp.GetValue(v);}catch{}
+                  int c=-1;if(gv is ICollection cc)c=cc.Count;else if(gv is IEnumerable en){c=0;foreach(var _ in en)c++;}
+                  Console.WriteLine($"    GEO {gn} TYPE={gp.PropertyType.FullName} COUNT={c}");
+                  if(gv is IEnumerable sample){int n=0;foreach(var x in sample){Console.WriteLine($"      SAMPLE {gn} {x}");if(++n>=2)break;}}
+                }
+              }
+            }
+            foreach(var pn in new[]{"Items","Children"}){
+              var p=t.GetProperty(pn);if(p==null)continue;object? v=null;try{v=p.GetValue(node);}catch{}
+              if(v is IEnumerable e)foreach(var child in e)Walk(child,depth+1);
+            }
+          }
+          Walk(scene.Root,0);
+          '@ | Set-Content Program.cs
+          $env:FBX=$fbx
+          dotnet run -c Release
+          Pop-Location
