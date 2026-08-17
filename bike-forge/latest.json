@@ -1,6 +1,6 @@
 {
-  "version": "2.3.0",
+  "version": "2.4.0",
   "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/bike-forge/releases/MXBBikeForge.exe",
-  "sha256": "0d705e6f7e0f8de0aa376f1fa326f6f6c234fb49c569437a372e876b737ce7f8",
-  "release_notes": "Fix automatic in-app updates: permanent Bike Forge update channel, no blank/editable update feed, cache-busted manifest and EXE downloads, relative manifest URL support, SHA-256 verification, and automatic helper replacement/relaunch with no manual close or reopen. Includes the v2.2 UI-freeze fixes and Blender-backed bike creation pipeline."
+  "sha256": "b5c6a63cfa1c56e8722086a4ba274a35aa839b92e73299e26a1bd8d02b6ee338",
+  "release_notes": "Performance/freeze rewrite: removes cross-process SetParent preview embedding, isolates iNsane in a separate preview host, adds cancellable external tools, caps Blender threads and lowers process priority, moves heavy build/preview staging to local Windows cache, replaces the growing text log with a bounded list, and moves assembly saves off the UI thread. Keeps Blender auto-creation and the permanent in-app auto-update channel."
 }
