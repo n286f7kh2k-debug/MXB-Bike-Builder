@@ -1,0 +1,90 @@
+name: Publish MXB Bike Forge update
+
+on:
+  push:
+    paths:
+      - 'bike-forge/release-request.json'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bike-forge-publisher
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23.x'
+
+      - name: Restore Bike Forge build source
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/mxb-bike-forge-src
+          mkdir -p /tmp/mxb-bike-forge-src
+          base64 --decode bike-forge/source.b64 > /tmp/mxb-bike-forge-source.tgz
+          tar -xzf /tmp/mxb-bike-forge-source.tgz -C /tmp/mxb-bike-forge-src
+
+      - name: Verify source and release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp/mxb-bike-forge-src
+          go test ./...
+          go vet ./...
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          req = json.loads(Path('/home/runner/work/MXB-Bike-Builder/MXB-Bike-Builder/bike-forge/release-request.json').read_text(encoding='utf-8'))
+          requested = str(req['version']).strip()
+          source = Path('VERSION').read_text(encoding='utf-8').strip()
+          if source != requested:
+              raise SystemExit(f'Version mismatch: release={requested} source={source}')
+          PY
+
+      - name: Build Windows x64 EXE and update manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p bike-forge/releases
+          cd /tmp/mxb-bike-forge-src
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build -trimpath -ldflags='-s -w -H=windowsgui' -o "$GITHUB_WORKSPACE/bike-forge/releases/MXBBikeForge.exe" .
+          cd "$GITHUB_WORKSPACE"
+          python - <<'PY'
+          import hashlib, json
+          from pathlib import Path
+          req = json.loads(Path('bike-forge/release-request.json').read_text(encoding='utf-8'))
+          exe = Path('bike-forge/releases/MXBBikeForge.exe')
+          digest = hashlib.sha256(exe.read_bytes()).hexdigest()
+          manifest = {
+              'version': str(req['version']).strip(),
+              'url': 'https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/main/bike-forge/releases/MXBBikeForge.exe',
+              'sha256': digest,
+              'release_notes': str(req.get('release_notes', '')).strip(),
+          }
+          Path('bike-forge/latest.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+          print('Published SHA-256:', digest)
+          PY
+
+      - name: Commit published update
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "MXB Bike Forge Update Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add bike-forge/releases/MXBBikeForge.exe bike-forge/latest.json
+          if git diff --cached --quiet; then
+            echo "No release changes to commit."
+            exit 0
+          fi
+          VERSION=$(python -c "import json; print(json.load(open('bike-forge/release-request.json'))['version'])")
+          git commit -m "Publish MXB Bike Forge v${VERSION}"
+          git push
