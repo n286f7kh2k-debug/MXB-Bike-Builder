@@ -1,0 +1,28 @@
+name: Inspect PiBoSo all PSD sizes
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths: ['.github/workflows/inspect-piboso-all-psd-sizes.yml']
+jobs:
+  inspect:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: pwsh
+        run: |
+          $root=Join-Path $env:RUNNER_TEMP 'psd-size';New-Item -ItemType Directory -Force $root|Out-Null
+          Invoke-WebRequest 'https://www.mx-bikes.com/downloads/templates.zip' -OutFile (Join-Path $root 'templates.zip')
+          Expand-Archive (Join-Path $root 'templates.zip') (Join-Path $root 'files') -Force
+          @'
+          from PIL import Image
+          import os,glob
+          root=os.path.join(os.environ['RUNNER_TEMP'],'psd-size','files')
+          for name in ['rider.psd','gloves.psd','helmet.psd','boots.psd']:
+              hits=list(glob.glob(os.path.join(root,'**',name),recursive=True))
+              if not hits:
+                  print(name,'MISSING');continue
+              im=Image.open(hits[0])
+              print(name, im.size, im.mode)
+          '@ | Set-Content (Join-Path $root 'inspect.py')
+          python (Join-Path $root 'inspect.py')
