@@ -1,0 +1,40 @@
+name: Build Paint Creator v9 PiBoSo Official Toolchain Reliable
+on:
+  push:
+    branches: [build/race-day-live-paint-creator]
+    paths:
+      - 'ci-paint-v9s/**'
+      - '.github/workflows/build-paint-creator-v9b.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Reconstruct verified v9 source
+        shell: pwsh
+        run: .\ci-paint-v9s\reconstruct-v9.ps1
+      - name: Compile v9 module
+        shell: pwsh
+        run: .\ci-paint-v9s\compile-v9.ps1
+      - name: Test official PiBoSo PSD FBX PaintEd
+        shell: pwsh
+        run: .\ci-paint-v9s\test-toolchain-v9.ps1
+      - name: Test official rider UV viewer
+        shell: pwsh
+        run: .\ci-paint-v9s\test-viewer-v9.ps1
+      - name: Test in-app hot swap
+        shell: pwsh
+        run: .\ci-paint-v9s\test-hotswap-v9.ps1
+      - name: Publish v9 in-app feed
+        shell: pwsh
+        run: .\ci-paint-v9s\publish-v9.ps1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Paint-Creator-v9-PIBOSO-OFFICIAL-HOT-MODULE
+          path: |
+            paint-creator/latest.json
+            paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v9_0_0.zip
+          retention-days: 7
