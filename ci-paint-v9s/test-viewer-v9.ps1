@@ -1,4 +1,8 @@
 $ErrorActionPreference='Stop'
+$svc=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\Services\OfficialMxBikesPreviewModelService.cs'
+Write-Host '=== OfficialMxBikesPreviewModelService.cs ==='
+Get-Content -LiteralPath $svc
+Write-Host '=== END SERVICE ==='
 $s=Join-Path $env:RUNNER_TEMP 'v9-viewer';New-Item -ItemType Directory -Force $s|Out-Null;$lib=Join-Path $env:SRC 'src\MXBRaceDayLive.PaintCreator\MXBRaceDayLive.PaintCreator.csproj'
 @"
 <Project Sdk="Microsoft.NET.Sdk"><PropertyGroup><OutputType>Exe</OutputType><TargetFramework>net8.0-windows</TargetFramework><UseWPF>true</UseWPF><ImplicitUsings>enable</ImplicitUsings></PropertyGroup><ItemGroup><ProjectReference Include="$lib"/></ItemGroup></Project>
