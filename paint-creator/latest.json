@@ -1,6 +1,6 @@
 {
-  "version": "10.0.0",
-  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/build/race-day-live-paint-creator/paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v10_0_0.zip",
-  "sha256": "4e5e38065e2240e4d479ff3862d2c333514fe74be11cb3d4f3bfe9a6bdd47f81",
-  "notes": "v10: BUY & INSTALL now uses verified PiBoSo PaintEd 1.4 CLI to create .pnt files automatically, detects the MX Bikes mods folder including [mods] folder overrides, installs to the correct paint directory, preserves official PiBoSo rider FBX/PSD templates, and hot-refreshes in app."
+  "version": "9.0.0",
+  "url": "https://raw.githubusercontent.com/n286f7kh2k-debug/MXB-Bike-Builder/build/race-day-live-paint-creator/paint-creator/releases/MXB_Race_Day_Live_Paint_Creator_Module_v9_0_0.zip",
+  "sha256": "dfa7d4a4e8ae9a9b100e51b748f6e0de37b5146735baafe3823fb6e0ab21bbc6",
+  "notes": "v9 PiBoSo official toolchain: official mxb_rider_template.FBX 3D UV viewer, rider/glove PSD template profiles, PaintEd integration, preserved UV placement/projects, and in-app hot updating."
 }
